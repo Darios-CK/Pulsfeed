@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>PULSFEED — Markt-Terminal</title>
+<link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiUHVsc2ZlZWQiLCJzaG9ydF9uYW1lIjoiUHVsc2ZlZWQiLCJzdGFydF91cmwiOiIuIiwiZGlzcGxheSI6InN0YW5kYWxvbmUiLCJiYWNrZ3JvdW5kX2NvbG9yIjoiIzA1MDcwYSIsInRoZW1lX2NvbG9yIjoiIzA1MDcwYSJ9">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+  :root{
+    --bg:#05070a;
+    --panel:#10151b;
+    --panel-2:#161c24;
+    --line:#202934;
+    --text:#c7d0db;
+    --text-dim:#5d6b7a;
+    --green:#00ff9d;
+    --red:#ff3b5c;
+    --amber:#ffb238;
+    --blue:#5fb3ff;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0; background:var(--bg); color:var(--text);}
+  body{
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    overflow-x:hidden;
+  }
+  .mono{font-family:'JetBrains Mono',monospace;}
+  .display{font-family:'Space Grotesk',sans-serif;}
+  a{color:inherit; text-decoration:none;}
+  button{cursor:pointer; font-family:inherit;}
+  ::-webkit-scrollbar{width:5px;}
+  ::-webkit-scrollbar-thumb{background:#202934; border-radius:3px;}
+
+  /* ---------- BOOT SEQUENCE ---------- */
+  #boot{
+    position:fixed; inset:0; background:var(--bg); z-index:999;
+    display:flex; align-items:center; justify-content:center;
+    flex-direction:column; gap:4px;
+  }
+  #boot .line{
+    font-family:'JetBrains Mono',monospace; font-size:0.8rem; color:var(--green);
+    opacity:0; animation:fadeIn 0.3s forwards;
+  }
+  #boot .line.dim{color:var(--text-dim);}
+  @keyframes fadeIn{ to{opacity:1;} }
+  #boot.hide{ display:none; }
+
+  /* ---------- TICKER BAND ---------- */
+  .tickerband{
+    background:#000; border-bottom:1px solid var(--line);
+    overflow:hidden; white-space:nowrap; padding:7px 0;
+    position:sticky; top:0; z-index:20;
+  }
+  .tickerband .track{
+    display:inline-block; padding-left:100%;
+    animation:scrollTicker 38s linear infinite;
+    font-family:'JetBrains Mono',monospace; font-size:0.72rem; letter-spacing:0.03em;
+  }
+  .tickerband .track span{ margin-right:2.4rem; color:var(--text-dim); }
+  .tickerband .track span.hot{ color:var(--red); }
+  @keyframes scrollTicker{ from{transform:translateX(0);} to{transform:translateX(-100%);} }
+
+  /* ---------- HEADER ---------- */
+  header{
+    position:sticky; top:29px; z-index:19; background:var(--bg);
+    border-bottom:1px solid var(--line);
+    padding:14px 16px 12px;
+  }
+  .headrow{ display:flex; justify-content:space-between; align-items:flex-start; }
+  .brand{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:1.4rem; letter-spacing:-0.01em; color:#eef2f6; }
+  .brand .dot{ color:var(--green); }
+  .status{ font-family:'JetBrains Mono',monospace; font-size:0.65rem; color:var(--text-dim); margin-top:3px; display:flex; align-items:center; gap:6px;}
+  .status .pulse-dot{ width:6px; height:6px; border-radius:50%; background:var(--green); animation:livedot 2s ease-in-out infinite; }
+  @keyframes livedot{ 0%,100%{opacity:1;} 50%{opacity:0.25;} }
+
+  .soundbtn{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    color:var(--text); padding:9px 14px; font-size:0.78rem; font-family:'JetBrains Mono',monospace;
+    display:flex; align-items:center; gap:6px;
+  }
+  .soundbtn.off{ color:var(--text-dim); }
+
+  .unlockbar{
+    background:#1c1606; color:var(--amber); font-size:0.72rem; text-align:center;
+    padding:8px 16px; border-bottom:1px solid #2a2009;
+  }
+  .errorbar{
+    background:#1c0a0e; color:var(--red); font-size:0.7rem; padding:8px 16px;
+    border-bottom:1px solid #2a1015; line-height:1.5;
+  }
+
+  /* ---------- SOURCE TOGGLES ---------- */
+  .sources{
+    display:flex; gap:6px; padding:12px 16px 4px; overflow-x:auto;
+  }
+  .srcpill{
+    flex:0 0 auto; font-family:'JetBrains Mono',monospace; font-size:0.68rem;
+    padding:6px 11px; border-radius:20px; border:1px solid var(--line);
+    background:transparent; color:var(--text-dim); white-space:nowrap;
+  }
+  .srcpill.active{ border-color:var(--green); color:var(--green); background:rgba(0,255,157,0.06); }
+
+  /* ---------- FEED ---------- */
+  .feed{ padding:14px 14px 40px; max-width:720px; margin:0 auto; }
+
+  .card{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    margin-bottom:10px; overflow:hidden; position:relative;
+    display:flex;
+  }
+  .card.flash{ animation:flashcard 0.8s ease-in-out 3; }
+  @keyframes flashcard{ 0%,100%{ background:var(--panel); } 50%{ background:#1a2b22; } }
+
+  .bar{ width:4px; flex:0 0 4px; }
+  .bar.high{ background:var(--red); }
+  .bar.medium{ background:var(--amber); }
+  .bar.low{ background:#3a6b54; }
+  .bar.news{ background:var(--blue); }
+  .bar.topic{ background:var(--green); }
+
+  .cardbody{ padding:13px 14px; flex:1; min-width:0; }
+
+  .metarow{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-bottom:7px; }
+  .metaleft{ font-size:0.68rem; color:var(--text-dim); display:flex; gap:8px; align-items:center; }
+  .badge{ font-family:'JetBrains Mono',monospace; font-size:0.62rem; padding:2px 7px; border-radius:4px; font-weight:700; letter-spacing:0.03em; }
+  .badge.high{ background:rgba(255,59,92,0.14); color:var(--red); }
+  .badge.medium{ background:rgba(255,178,56,0.14); color:var(--amber); }
+  .badge.low{ background:rgba(0,255,157,0.1); color:#3a6b54; }
+  .countdown{ font-family:'JetBrains Mono',monospace; font-size:0.72rem; color:var(--blue); font-weight:700; }
+  .timestamp{ font-family:'JetBrains Mono',monospace; font-size:0.68rem; color:var(--text-dim); }
+
+  .title{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:0.98rem; color:#eef2f6; line-height:1.35; margin-bottom:8px; }
+
+  .datarow{ display:flex; gap:16px; font-family:'JetBrains Mono',monospace; font-size:0.74rem; color:var(--text-dim); flex-wrap:wrap; }
+  .datarow b{ color:var(--text); }
+  .datarow .actual{ color:var(--green); }
+
+  .insight{
+    margin-top:10px; padding-top:10px; border-top:1px dashed var(--line);
+    font-size:0.78rem; line-height:1.55; color:#aab4c0;
+  }
+  .insight .lead{ color:var(--blue); font-family:'JetBrains Mono',monospace; font-size:0.68rem; letter-spacing:0.04em; margin-bottom:5px; text-transform:uppercase; }
+  .insight b{ color:#d6dde5; }
+  .insight .caveat{ color:var(--text-dim); margin-top:4px; display:block; }
+
+  .empty, .loading{
+    text-align:center; color:var(--text-dim); font-family:'JetBrains Mono',monospace;
+    font-size:0.8rem; padding:60px 20px; line-height:1.7;
+  }
+
+  footer{
+    text-align:center; font-size:0.66rem; color:var(--text-dim);
+    padding:20px 24px 36px; line-height:1.7; font-family:'JetBrains Mono',monospace;
+  }
+
+  @media (min-width:600px){
+    .brand{ font-size:1.6rem; }
+    .feed{ padding:18px 18px 50px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="boot">
+  <div class="line mono" style="color:#eef2f6; font-size:1.1rem; margin-bottom:10px;">PULSFEED</div>
+  <div class="line dim" style="animation-delay:0.2s">init quellen…</div>
+  <div class="line dim" style="animation-delay:0.5s">forexfactory · yahoo · investing · marketwatch</div>
+  <div class="line dim" style="animation-delay:0.8s">bbc · al jazeera · cnbc</div>
+  <div class="line" style="animation-delay:1.2s; color:var(--green);">verbindung herstellen…</div>
+</div>
+
+<div class="tickerband">
+  <div class="track" id="tickertrack">
+    <span>PULSFEED LIVE</span><span>VERBINDE MIT QUELLEN…</span>
+  </div>
+</div>
+
+<header>
+  <div class="headrow">
+    <div>
+      <div class="brand">PULS<span class="dot">FEED</span></div>
+      <div class="status"><span class="pulse-dot"></span><span id="statustext">Lade…</span></div>
+    </div>
+    <button class="soundbtn" id="soundbtn">🔔 Ton an</button>
+  </div>
+</header>
+
+<div class="unlockbar" id="unlockbar">Einmal irgendwo tippen, um Ton-Alarme zu aktivieren.</div>
+<div class="errorbar" id="errorbar" style="display:none;"></div>
+
+<div class="sources" id="sourcepills"></div>
+
+<main class="feed" id="feed">
+  <div class="loading">TERMINAL STARTET<br>Wirtschaftskalender und Newsquellen werden geladen…</div>
+</main>
+
+<footer>
+  Quellen: ForexFactory Calendar · Yahoo Finance · Investing.com · MarketWatch · BBC World · Al Jazeera · CNBC<br>
+  Datenabfrage alle 45–75s je Quelle · Anzeige aktualisiert sich alle 5s<br>
+  Einschätzungen sind allgemeine historische Tendenzen, keine Anlage- oder Handelsempfehlung.<br>
+  Trading-Entscheidungen triffst du eigenverantwortlich.
+</footer>
+
+<script>
+// ============================================================
+// KONFIGURATION
+// ============================================================
+const PROXIES = [
+  url => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
+  url => 'https://corsproxy.io/?url=' + encodeURIComponent(url),
+  url => 'https://proxy.cors.sh/' + url,
+  url => 'https://thingproxy.freeboard.io/fetch/' + url,
+];
+
+const FF_URL = 'https://nfs.faireconomy.media/ff_calendar_thisweek.json';
+
+const NEWS_FEEDS = [
+  { url: 'https://feeds.finance.yahoo.com/rss/2.0/headline', source: 'Yahoo Finance', key:'yahoo' },
+  { url: 'https://www.investing.com/rss/news.rss', source: 'Investing.com', key:'investing' },
+  { url: 'https://feeds.marketwatch.com/marketwatch/topstories/', source: 'MarketWatch', key:'marketwatch' },
+  { url: 'https://feeds.bbci.co.uk/news/world/rss.xml', source: 'BBC World', key:'bbc' },
+  { url: 'https://www.aljazeera.com/xml/rss/all.xml', source: 'Al Jazeera', key:'aljazeera' },
+  { url: 'https://www.cnbc.com/id/100003114/device/rss/rss.html', source: 'CNBC World', key:'cnbc' },
+];
+
+const DATA_FETCH_MS = 60000;
+const TICK_MS = 5000;
+const SEEN_KEY_CAL = 'pf_seen_cal_v3';
+const SEEN_KEY_NEWS = 'pf_seen_news_v3';
+
+// ============================================================
+// WISSENSBASIS
+// ============================================================
+const INDICATOR_KNOWLEDGE = {
+  'unemployment': { assetClass:'USD-Paare, Staatsanleihen, Zins-sensitive Aktien (Tech, Immobilien)',
+    higher:'höher als erwartet → schwächerer Arbeitsmarkt → historisch oft USD-schwächend (Zinssenkungs-Erwartung steigt), Anleihen oft fester',
+    lower:'niedriger als erwartet → robuster Arbeitsmarkt → historisch oft USD-stärkend, Zinssenkungs-Erwartung sinkt',
+    caveat:'Reaktion oft stark abhängig von gleichzeitigen Lohndaten; bei Extremwerten auch gegenteilige Reaktion möglich' },
+  'non-farm': { assetClass:'USD-Paare, US-Indizes, Gold',
+    higher:'höher als erwartet → starker Arbeitsmarkt → historisch oft USD-stärkend, kann Aktien kurzfristig belasten',
+    lower:'niedriger als erwartet → schwächerer Arbeitsmarkt → historisch oft USD-schwächend, Aktien können profitieren',
+    caveat:'Einer der volatilsten Datenpunkte überhaupt — erste Reaktion dreht sich oft innerhalb von Minuten' },
+  'interest rate': { assetClass:'Alle Paare der jeweiligen Zentralbank, Anleihen, Aktienindizes',
+    higher:'Zinsanhebung/hawkishe Töne → historisch oft währungsstärkend, Aktien/Anleihen unter Druck',
+    lower:'Zinssenkung/dovishe Töne → historisch oft währungsschwächend, Aktien/Anleihen oft gestützt',
+    caveat:'Pressekonferenz-Wortlaut bewegt oft mehr als die Zahl selbst' },
+  'cpi': { assetClass:'Währungspaare, Gold, Anleihen, Zins-sensitive Sektoren',
+    higher:'höher als erwartet → mehr Inflationsdruck → historisch oft währungsstärkend, Anleihen unter Druck',
+    lower:'niedriger als erwartet → weniger Inflationsdruck → historisch oft währungsschwächend, Anleihen/Aktien oft gestützt',
+    caveat:'Kerninflation wird vom Markt oft stärker gewichtet als der Headline-Wert' },
+  'gdp': { assetClass:'Landeswährung, Aktienindizes, Rohstoffwährungen',
+    higher:'höher als erwartet → stärkeres Wachstum → historisch oft währungs- und aktienstützend',
+    lower:'niedriger als erwartet → schwächeres Wachstum → historisch oft belastend, kann aber Zinssenkungs-Hoffnung wecken',
+    caveat:'Stark nachlaufender Indikator — Markt hat oft schon reagiert' },
+  'retail sales': { assetClass:'Landeswährung, Konsum-Aktien',
+    higher:'höher als erwartet → starker Konsum → historisch oft währungsstärkend',
+    lower:'niedriger als erwartet → schwacher Konsum → historisch oft währungsschwächend',
+    caveat:'Volatil und oft nachträglich stark revidiert' },
+  'pmi': { assetClass:'Landeswährung, Industrie-/Sektor-Aktien',
+    higher:'über 50 und steigend → Expansion → historisch oft stützend',
+    lower:'unter 50 und fallend → Kontraktion → historisch oft belastend',
+    caveat:'Frühindikator, oft stärker beachtet als verzögerte Daten wie BIP' },
+  'ppi': { assetClass:'Währung, Industrie-Aktien (Margenseite)',
+    higher:'höher als erwartet → steigende Einkaufspreise für Firmen → kann Margen drücken, Frühindikator für CPI',
+    lower:'niedriger/fallend → sinkende Einkaufspreise → potenziell margenstützend für Industrie/Einzelhandel',
+    caveat:'Wirkung auf einzelne Aktien hängt davon ab, ob Preise weitergegeben werden können' },
+  'trade balance': { assetClass:'Landeswährung, Export-Sektor-Aktien',
+    higher:'größerer Überschuss als erwartet → historisch oft währungsstärkend',
+    lower:'größeres Defizit als erwartet → historisch oft währungsschwächend',
+    caveat:'Wird meist als nachrangig zu Zins-/Inflationsdaten behandelt' },
+  'consumer confidence': { assetClass:'Landeswährung, Konsum- und Einzelhandelsaktien',
+    higher:'höher als erwartet → optimistischere Verbraucher → historisch oft leicht stützend für Konsumwerte',
+    lower:'niedriger als erwartet → pessimistischere Verbraucher → historisch oft leicht belastend',
+    caveat:'Stimmungsindikator, meist schwächere Marktwirkung als harte Daten' },
+};
+
+function matchIndicator(title){
+  const t = (title||'').toLowerCase();
+  for(const [key,val] of Object.entries(INDICATOR_KNOWLEDGE)){
+    if(t.includes(key)) return val;
+  }
+  return null;
+}
+
+const TOPIC_KNOWLEDGE = [
+  { keywords:['iran','israel','middle east','nahost','houthi','red sea','gaza'],
+    assetClass:'Ölpreis (Brent/WTI), Gold, Energie-Aktien, Airline-Aktien, sichere Häfen (CHF, JPY)',
+    tendency:'Eskalationen im Nahen Osten führen historisch zu kurzfristigen Anstiegen bei Öl und Gold',
+    caveat:'Stark abhängig davon, ob Ankündigungen zu echten Handlungen führen' },
+  { keywords:['fed ','federal reserve','powell','zentralbank','ecb','bank of japan','rate decision'],
+    assetClass:'Währungen, Anleihen, Aktienindizes',
+    tendency:'Aussagen von Notenbankern bewegen oft mehr als harte Daten — Markt reagiert auf Tonfall',
+    caveat:'Erste Reaktion dreht sich häufig nach genauerer Analyse des Wortlauts' },
+  { keywords:['opec','oil supply','ölförderung','pipeline','crude'],
+    assetClass:'Ölpreis, Energie-Aktien, Fluggesellschaften',
+    tendency:'Förderkürzungen historisch preistreibend, Förderausweitung historisch preisdrückend',
+    caveat:'Tatsächliche Umsetzung weicht oft von Ankündigungen ab' },
+  { keywords:['tariff','zoll','zölle','trade war','handelskrieg'],
+    assetClass:'Betroffene Sektor-Aktien (Industrie, Tech, Auto), Landeswährungen',
+    tendency:'Neue Zölle historisch belastend für exportabhängige Aktien',
+    caveat:'Verhandlungsdynamik macht Ausgang oft kurzfristig sehr unsicher' },
+  { keywords:['chip','semiconductor','halbleiter','nvidia','taiwan'],
+    assetClass:'Tech-/Halbleiter-Aktien, Taiwan-Dollar',
+    tendency:'Lieferketten-Störungen oder Exportbeschränkungen historisch volatil für den Sektor',
+    caveat:'Einzelfirmen können sehr unterschiedlich betroffen sein' },
+  { keywords:['recession','rezession','downgrade','default','bankruptcy','insolvenz'],
+    assetClass:'Breite Aktienindizes, Risiko-Anlagen, sichere Häfen',
+    tendency:'Rezessions- oder Ausfallsignale historisch oft belastend für Risiko-Anlagen, stützend für Anleihen/Gold',
+    caveat:'Märkte preisen solche Risiken oft schon vorher teilweise ein' },
+];
+
+function matchTopic(title){
+  const t = (title||'').toLowerCase();
+  for(const topic of TOPIC_KNOWLEDGE){
+    if(topic.keywords.some(k=>t.includes(k))) return topic;
+  }
+  return null;
+}
+
+// ============================================================
+// SOUND
+// ============================================================
+let audioCtx = null;
+function playTone(kind){
+  try{
+    if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    const now = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.type='sine';
+    if(kind==='high'){
+      [ [880,0],[660,0.22],[880,0.46] ].forEach(([freq,t])=>{
+        osc.frequency.setValueAtTime(freq, now+t);
+        gain.gain.setValueAtTime(0.0001, now+t);
+        gain.gain.exponentialRampToValueAtTime(0.3, now+t+0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now+t+0.18);
+      });
+      osc.start(now); osc.stop(now+0.7);
+    } else {
+      osc.frequency.setValueAtTime(520, now);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.18, now+0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now+0.2);
+      osc.start(now); osc.stop(now+0.3);
+    }
+  }catch(e){ /* noch nicht freigeschaltet */ }
+}
+
+// ============================================================
+// PERSISTENZ
+// ============================================================
+function loadSeen(key){
+  try{ const raw = localStorage.getItem(key); return raw ? new Set(JSON.parse(raw)) : new Set(); }
+  catch{ return new Set(); }
+}
+function saveSeen(key, set){
+  try{ localStorage.setItem(key, JSON.stringify(Array.from(set).slice(-1000))); }catch(e){}
+}
+
+let seenCal = loadSeen(SEEN_KEY_CAL);
+let seenNews = loadSeen(SEEN_KEY_NEWS);
+
+// ============================================================
+// FETCH MIT PROXY-FALLBACK
+// ============================================================
+async function fetchWithFallback(targetUrl, timeoutMs=9000){
+  let lastErr = null;
+  for(const buildUrl of PROXIES){
+    try{
+      const controller = new AbortController();
+      const timer = setTimeout(()=>controller.abort(), timeoutMs);
+      const res = await fetch(buildUrl(targetUrl), { signal: controller.signal });
+      clearTimeout(timer);
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      const text = await res.text();
+      if(!text || text.length < 10) throw new Error('Leere Antwort');
+      return text;
+    }catch(e){ lastErr = e; continue; }
+  }
+  throw lastErr || new Error('Alle Proxies fehlgeschlagen');
+}
+
+function parseRSS(xmlText, source){
+  try{
+    const doc = new DOMParser().parseFromString(xmlText, 'text/xml');
+    const items = Array.from(doc.querySelectorAll('item'));
+    return items.map(item=>{
+      const get = tag => item.querySelector(tag)?.textContent?.trim() || '';
+      return {
+        id: get('link') || get('guid') || (source+get('title')),
+        title: get('title'),
+        link: get('link'),
+        pubDate: get('pubDate'),
+        source
+      };
+    });
+  }catch(e){ return []; }
+}
+
+// ============================================================
+// STATE
+// ============================================================
+let calendarRaw = [];
+let newsRaw = [];
+let soundOn = true;
+let audioUnlocked = false;
+let flashIds = new Set();
+let errors = [];
+let activeSources = new Set(['ff','yahoo','investing','marketwatch','bbc','aljazeera','cnbc']);
+let firstLoad = true;
+
+function impactRank(impact){
+  const i=(impact||'low').toLowerCase();
+  if(i.includes('high')) return 2;
+  if(i.includes('medium')) return 1;
+  return 0;
+}
+function impactClass(impact){
+  const i=(impact||'').toLowerCase();
+  if(i.includes('high')) return 'high';
+  if(i.includes('medium')) return 'medium';
+  return 'low';
+}
+function fmtCountdown(ms){
+  if(ms<=0) return null;
+  const s = Math.floor(ms/1000);
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
+  const pad = n=>String(n).padStart(2,'0');
+  return (h>0?pad(h)+':':'')+pad(m)+':'+pad(sec);
+}
+function timeAgo(dateStr){
+  const d = new Date(dateStr).getTime();
+  if(isNaN(d)) return '';
+  const diff = Date.now()-d;
+  const min = Math.floor(diff/60000);
+  if(min<1) return 'jetzt';
+  if(min<60) return 'vor '+min+' Min';
+  const h = Math.floor(min/60);
+  if(h<24) return 'vor '+h+' Std';
+  return 'vor '+Math.floor(h/24)+' Tg';
+}
+
+// ============================================================
+// DATENABRUF
+// ============================================================
+async function fetchCalendar(){
+  try{
+    const text = await fetchWithFallback(FF_URL);
+    const data = JSON.parse(text);
+    if(!Array.isArray(data)) throw new Error('Unerwartetes Format');
+    const parsed = data.filter(e=>e&&e.date).map(e=>({
+      kind:'calendar',
+      id:'cal-'+e.title+'-'+e.date+'-'+e.country,
+      title:e.title, country:e.country, impact:e.impact, date:e.date,
+      timestamp:new Date(e.date).getTime(),
+      forecast:e.forecast, previous:e.previous, actual:e.actual,
+      knowledge: matchIndicator(e.title)
+    }));
+    if(!firstLoad){
+      const newlyPublished = parsed.filter(e=>e.actual && e.actual!=='' && !seenCal.has(e.id+'_a'));
+      if(newlyPublished.length){
+        const hasHigh = newlyPublished.some(e=>(e.impact||'').toLowerCase().includes('high'));
+        if(soundOn) playTone(hasHigh?'high':'low');
+        newlyPublished.forEach(e=>flashIds.add(e.id));
+        setTimeout(()=>{ newlyPublished.forEach(e=>flashIds.delete(e.id)); render(); }, 5000);
+      }
+    }
+    parsed.forEach(e=>{ if(e.actual && e.actual!=='') seenCal.add(e.id+'_a'); });
+    saveSeen(SEEN_KEY_CAL, seenCal);
+    calendarRaw = parsed;
+    return null;
+  }catch(e){ return 'ForexFactory: '+(e.message||'Fehler'); }
+}
+
+async function fetchNewsFeed(feed){
+  try{
+    const text = await fetchWithFallback(feed.url);
+    const items = parseRSS(text, feed.source);
+    if(items.length===0) throw new Error('keine Daten');
+    return { key:feed.key, items: items.map(it=>({...it})) , error:null };
+  }catch(e){ return { key:feed.key, items:[], error: feed.source+': nicht erreichbar' }; }
+}
+
+async function fetchAllNews(){
+  const results = await Promise.all(NEWS_FEEDS.map(fetchNewsFeed));
+  const errs = [];
+  let allItems = [];
+  results.forEach(r=>{
+    if(r.error) errs.push(r.error);
+    allItems = allItems.concat(r.items.map(it=>({...it, srcKey:r.key})));
+  });
+  const parsed = allItems.map(it=>({
+    kind:'news',
+    id:'news-'+it.id,
+    title:it.title, link:it.link, pubDate:it.pubDate,
+    timestamp: new Date(it.pubDate).getTime() || Date.now(),
+    source:it.source, srcKey: it.srcKey,
+    topic: matchTopic(it.title)
+  }));
+  if(!firstLoad){
+    const newOnes = parsed.filter(it=>!seenNews.has(it.id));
+    if(newOnes.length){
+      const hasTopic = newOnes.some(it=>it.topic);
+      if(soundOn) playTone(hasTopic?'high':'low');
+      newOnes.forEach(it=>flashIds.add(it.id));
+      setTimeout(()=>{ newOnes.forEach(it=>flashIds.delete(it.id)); render(); }, 5000);
+    }
+  }
+  parsed.forEach(it=>seenNews.add(it.id));
+  saveSeen(SEEN_KEY_NEWS, seenNews);
+  newsRaw = parsed.sort((a,b)=>b.timestamp-a.timestamp).slice(0,80);
+  return errs;
+}
+
+async function refreshAll(){
+  const [calErr, newsErrs] = await Promise.all([fetchCalendar(), fetchAllNews()]);
+  errors = [calErr, ...newsErrs].filter(Boolean);
+  firstLoad = false;
+  document.getElementById('statustext').textContent = 'Aktualisiert · ' + new Date().toLocaleTimeString('de-DE');
+  updateTicker();
+  render();
+}
+
+// ============================================================
+// TICKER BAND
+// ============================================================
+function updateTicker(){
+  const track = document.getElementById('tickertrack');
+  const items = [...calendarRaw.filter(e=>e.timestamp>Date.now()-3600000 && e.actual), ...newsRaw.slice(0,8)];
+  if(items.length===0){ track.innerHTML = '<span>PULSFEED LIVE</span>'; return; }
+  track.innerHTML = items.slice(0,12).map(it=>{
+    const hot = it.kind==='calendar' ? impactClass(it.impact)==='high' : !!it.topic;
+    const txt = it.kind==='calendar' ? (it.country+' '+it.title+': '+it.actual) : it.title;
+    return '<span class="'+(hot?'hot':'')+'">'+escapeHtml(txt)+'</span>';
+  }).join('');
+}
+
+function escapeHtml(s){
+  const d = document.createElement('div');
+  d.textContent = s||'';
+  return d.innerHTML;
+}
+
+// ============================================================
+// RENDER
+// ============================================================
+function buildCombinedFeed(){
+  const now = Date.now();
+  const cal = calendarRaw.filter(e=>{
+    return e.timestamp > now - 24*3600*1000 && e.timestamp < now + 7*24*3600*1000;
+  });
+  const news = newsRaw.filter(it=>activeSources.has(it.srcKey));
+  const calFiltered = activeSources.has('ff') ? cal : [];
+  const combined = [...calFiltered, ...news].sort((a,b)=>{
+    const aF = a.timestamp>now, bF = b.timestamp>now;
+    if(aF && !bF) return 1;
+    if(!aF && bF) return -1;
+    if(aF && bF) return a.timestamp-b.timestamp;
+    return b.timestamp-a.timestamp;
+  });
+  return combined;
+}
+
+function renderCalendarCard(item, now){
+  const isFuture = item.timestamp > now;
+  const countdown = isFuture ? fmtCountdown(item.timestamp-now) : null;
+  const published = item.actual && item.actual !== '';
+  const k = item.knowledge;
+  const cls = impactClass(item.impact);
+  const flash = flashIds.has(item.id) ? ' flash' : '';
+
+  let insightHtml = '';
+  if(published && k){
+    const actualNum = parseFloat(item.actual);
+    const forecastNum = parseFloat(item.forecast);
+    const tendency = (!isNaN(actualNum) && !isNaN(forecastNum) && actualNum > forecastNum) ? k.higher : k.lower;
+    insightHtml = `
+      <div class="insight">
+        <div class="lead">Was das bedeutet</div>
+        <div><b>Betroffen:</b> ${escapeHtml(k.assetClass)}</div>
+        <div><b>Tendenz:</b> ${escapeHtml(tendency)}</div>
+        <span class="caveat"><b>Unsicherheit:</b> ${escapeHtml(k.caveat)}</span>
+      </div>`;
+  }
+
+  return `
+    <div class="card${flash}">
+      <div class="bar ${cls}"></div>
+      <div class="cardbody">
+        <div class="metarow">
+          <div class="metaleft">
+            <span>📅 ${escapeHtml(item.country||'')}</span>
+            <span class="badge ${cls}">${cls==='high'?'HOCH':cls==='medium'?'MITTEL':'NIEDRIG'}</span>
+          </div>
+          ${isFuture ? `<span class="countdown">⏳ ${countdown}</span>` : `<span class="timestamp">${new Date(item.date).toLocaleString('de-DE',{weekday:'short',hour:'2-digit',minute:'2-digit'})}</span>`}
+        </div>
+        <div class="title">${escapeHtml(item.title)}</div>
+        <div class="datarow">
+          <span>Prognose: <b>${escapeHtml(item.forecast)||'—'}</b></span>
+          <span>Vorher: <b>${escapeHtml(item.previous)||'—'}</b></span>
+          ${published ? `<span class="actual">Tatsächlich: ${escapeHtml(item.actual)}</span>` : ''}
+        </div>
+        ${insightHtml}
+      </div>
+    </div>`;
+}
+
+function renderNewsCard(item){
+  const flash = flashIds.has(item.id) ? ' flash' : '';
+  const cls = item.topic ? 'topic' : 'news';
+  let insightHtml = '';
+  if(item.topic){
+    insightHtml = `
+      <div class="insight">
+        <div class="lead">Was das bedeutet</div>
+        <div><b>Betroffen:</b> ${escapeHtml(item.topic.assetClass)}</div>
+        <div><b>Tendenz:</b> ${escapeHtml(item.topic.tendency)}</div>
+        <span class="caveat"><b>Unsicherheit:</b> ${escapeHtml(item.topic.caveat)}</span>
+      </div>`;
+  }
+  return `
+    <a class="card${flash}" href="${item.link}" target="_blank" rel="noopener noreferrer">
+      <div class="bar ${cls}"></div>
+      <div class="cardbody">
+        <div class="metarow">
+          <div class="metaleft"><span>📰 ${escapeHtml(item.source)}</span></div>
+          <span class="timestamp">${timeAgo(item.pubDate)}</span>
+        </div>
+        <div class="title">${escapeHtml(item.title)}</div>
+        ${insightHtml}
+      </div>
+    </a>`;
+}
+
+function render(){
+  const feed = document.getElementById('feed');
+  const now = Date.now();
+  const combined = buildCombinedFeed();
+
+  if(combined.length===0 && errors.length===0){
+    feed.innerHTML = '<div class="loading">DATEN WERDEN GELADEN…</div>';
+  } else if(combined.length===0){
+    feed.innerHTML = '<div class="empty">KEINE DATEN VERFÜGBAR<br><br>Alle aktiven Quellen sind aktuell nicht erreichbar.<br>Nächster Versuch automatisch in Kürze.</div>';
+  } else {
+    feed.innerHTML = combined.map(item=>
+      item.kind==='calendar' ? renderCalendarCard(item, now) : renderNewsCard(item)
+    ).join('');
+  }
+
+  // Error bar
+  const errorbar = document.getElementById('errorbar');
+  if(errors.length>0){
+    errorbar.style.display = 'block';
+    errorbar.textContent = '⚠ ' + errors.join(' · ');
+  } else {
+    errorbar.style.display = 'none';
+  }
+}
+
+// ============================================================
+// SOURCE PILLS
+// ============================================================
+const SOURCE_LIST = [
+  {key:'ff', label:'ForexFactory'},
+  {key:'yahoo', label:'Yahoo Finance'},
+  {key:'investing', label:'Investing.com'},
+  {key:'marketwatch', label:'MarketWatch'},
+  {key:'bbc', label:'BBC World'},
+  {key:'aljazeera', label:'Al Jazeera'},
+  {key:'cnbc', label:'CNBC'},
+];
+
+function renderSourcePills(){
+  const container = document.getElementById('sourcepills');
+  container.innerHTML = SOURCE_LIST.map(s=>
+    `<button class="srcpill${activeSources.has(s.key)?' active':''}" data-key="${s.key}">${s.label}</button>`
+  ).join('');
+  container.querySelectorAll('.srcpill').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const key = btn.dataset.key;
+      if(activeSources.has(key)) activeSources.delete(key);
+      else activeSources.add(key);
+      renderSourcePills();
+      render();
+    });
+  });
+}
+
+// ============================================================
+// INIT
+// ============================================================
+function unlockAudio(){
+  if(!audioUnlocked){
+    playTone('low');
+    audioUnlocked = true;
+    document.getElementById('unlockbar').style.display = 'none';
+  }
+}
+
+document.body.addEventListener('click', unlockAudio, { once:false });
+
+document.getElementById('soundbtn').addEventListener('click', (e)=>{
+  e.stopPropagation();
+  unlockAudio();
+  soundOn = !soundOn;
+  const btn = document.getElementById('soundbtn');
+  btn.textContent = soundOn ? '🔔 Ton an' : '🔕 Ton aus';
+  btn.classList.toggle('off', !soundOn);
+});
+
+renderSourcePills();
+
+setTimeout(()=>{
+  document.getElementById('boot').classList.add('hide');
+}, 1500);
+
+refreshAll();
+setInterval(refreshAll, DATA_FETCH_MS);
+setInterval(render, TICK_MS);
+</script>
+</body>
+</html>
