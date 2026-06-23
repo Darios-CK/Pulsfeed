@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>PULSFEED — Glossar</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap');
+  :root{ --bg:#060809; --panel:#0f1318; --line:#1f2730; --text:#c7d0db; --text-dim:#5d6b7a; --green:#00ff9d; --blue:#5fb3ff; }
+  *{box-sizing:border-box;} html,body{margin:0; padding:0; background:var(--bg); color:var(--text); font-family:'Inter',sans-serif;}
+  a{color:inherit; text-decoration:none;} button{cursor:pointer; font-family:inherit; background:none; border:none; color:inherit;}
+  #overlay{ position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:90; opacity:0; pointer-events:none; transition:opacity 0.25s; } #overlay.show{ opacity:1; pointer-events:auto; }
+  #sidemenu{ position:fixed; top:0; left:0; height:100%; width:82%; max-width:340px; background:var(--panel); border-right:1px solid var(--line); z-index:100; transform:translateX(-100%); transition:transform 0.28s ease; overflow-y:auto; }
+  #sidemenu.show{ transform:translateX(0); }
+  .menuhead{ padding:20px 18px 14px; border-bottom:1px solid var(--line); } .menuhead .brand{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:1.25rem; color:#eef2f6; }
+  .menuhead .sub{ font-size:0.68rem; color:var(--text-dim); margin-top:3px; font-family:'JetBrains Mono',monospace; }
+  .menusection{ padding:14px 18px 4px; font-family:'JetBrains Mono',monospace; font-size:0.65rem; color:var(--text-dim); letter-spacing:0.06em; text-transform:uppercase; }
+  .menuitem{ display:flex; align-items:center; gap:12px; padding:13px 18px; border-bottom:1px solid #161b21; font-size:0.92rem; color:var(--text); }
+  .menuitem .ic{ font-size:1.1rem; width:22px; text-align:center; } .menuitem .desc{ font-size:0.7rem; color:var(--text-dim); margin-top:2px; }
+  .menuitem.active{ background:rgba(0,255,157,0.06); border-left:3px solid var(--green); } .menuitem .txt{ flex:1; }
+  header{ position:sticky; top:0; z-index:19; background:var(--bg); border-bottom:1px solid var(--line); padding:13px 16px 11px; }
+  .headrow{ display:flex; justify-content:space-between; align-items:center; } .hleft{ display:flex; align-items:center; gap:12px; }
+  .menubtn{ font-size:1.3rem; padding:6px; color:var(--text); }
+  .brandwrap .brand{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:1.3rem; color:#eef2f6; }
+  .feed{ padding:14px 16px 40px; max-width:720px; margin:0 auto; }
+  .entry{ background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin-bottom:10px; }
+  .term{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:1rem; color:var(--blue); margin-bottom:6px; }
+  .def{ font-size:0.86rem; line-height:1.55; color:var(--text); }
+</style>
+</head>
+<body>
+
+<div id="overlay"></div>
+<nav id="sidemenu">
+  <div class="menuhead"><div class="brand">PULSFEED</div><div class="sub">Markt-Terminal · Navigation</div></div>
+  <div class="menusection">Bereiche</div>
+  <a class="menuitem" href="index.html"><span class="ic">📊</span><span class="txt">Dashboard<div class="desc">Live News & Wirtschaftskalender</div></span></a>
+  <a class="menuitem" href="earnings.html"><span class="ic">📅</span><span class="txt">Earnings-Kalender<div class="desc">Quartalszahlen der 30 wichtigsten Firmen</div></span></a>
+  <a class="menuitem" href="analysten.html"><span class="ic">🎯</span><span class="txt">Analysten-Einschätzungen<div class="desc">Strong Buy/Buy/Hold/Sell-Konsens</div></span></a>
+  <a class="menuitem" href="crypto.html"><span class="ic">₿</span><span class="txt">Krypto-Markt<div class="desc">BTC, ETH & Markt-News</div></span></a>
+  <a class="menuitem" href="forex.html"><span class="ic">💱</span><span class="txt">Währungspaare<div class="desc">EUR/USD, GBP/USD & weitere FX-News</div></span></a>
+  <a class="menuitem" href="indizes.html"><span class="ic">📈</span><span class="txt">Nasdaq & S&P 500<div class="desc">US-Leitindizes mit getrennten News</div></span></a>
+  <a class="menuitem" href="zinsen.html"><span class="ic">🏦</span><span class="txt">Notenbanken & Zinsen<div class="desc">Fed, EZB & weitere Termine</div></span></a>
+  <a class="menuitem" href="rohstoffe.html"><span class="ic">🛢️</span><span class="txt">Rohstoffe<div class="desc">Öl, Gold, Industriemetalle</div></span></a>
+  <div class="menusection">Info</div>
+  <a class="menuitem active" href="glossar.html"><span class="ic">📖</span><span class="txt">Glossar<div class="desc">Begriffe & Indikatoren erklärt</div></span></a>
+</nav>
+
+<header><div class="headrow"><div class="hleft"><button class="menubtn" id="menubtn">☰</button>
+  <div class="brandwrap"><div class="brand">GLOSSAR</div></div></div></div></header>
+
+<main class="feed">
+  <div class="entry"><div class="term">Non-Farm Payrolls (NFP)</div><div class="def">Monatlicher US-Bericht zur Zahl neu geschaffener Stellen außerhalb der Landwirtschaft. Einer der meistbeachteten und volatilsten Termine im Wirtschaftskalender.</div></div>
+  <div class="entry"><div class="term">CPI (Consumer Price Index)</div><div class="def">Verbraucherpreisindex — misst die Inflation auf Konsumentenebene. Zentral für Zinsentscheidungen der Notenbanken.</div></div>
+  <div class="entry"><div class="term">PPI (Producer Price Index)</div><div class="def">Erzeugerpreisindex — misst Preisveränderungen auf Großhandels-/Herstellerebene, gilt oft als Frühindikator für die Verbraucherinflation.</div></div>
+  <div class="entry"><div class="term">PMI (Purchasing Managers' Index)</div><div class="def">Einkaufsmanagerindex — Stimmungsindikator unter Einkaufsmanagern. Werte über 50 deuten auf Expansion, unter 50 auf Kontraktion hin.</div></div>
+  <div class="entry"><div class="term">FOMC</div><div class="def">Federal Open Market Committee — das Gremium der US-Notenbank Fed, das über die Leitzinsen entscheidet.</div></div>
+  <div class="entry"><div class="term">Hawkish / Dovish</div><div class="def">"Hawkish" beschreibt eine restriktive, zinserhöhungs-geneigte Tonlage einer Notenbank. "Dovish" beschreibt eine lockere, zinssenkungs-geneigte Tonlage.</div></div>
+  <div class="entry"><div class="term">Basis Point (bps)</div><div class="def">Ein Hundertstel eines Prozentpunkts. Zinsänderungen werden oft in Basispunkten angegeben (z.B. "25 bps" = 0,25%).</div></div>
+  <div class="entry"><div class="term">Forecast / Prognose</div><div class="def">Die von Analysten im Vorfeld erwartete Zahl für eine Wirtschaftsdaten-Veröffentlichung. Die Marktreaktion entsteht meist aus der Abweichung zwischen Prognose und tatsächlichem Wert (Actual), nicht aus dem absoluten Wert selbst.</div></div>
+  <div class="entry"><div class="term">Actual / Tatsächlicher Wert</div><div class="def">Der bei Veröffentlichung tatsächlich gemeldete Wert eines Wirtschaftsindikators — der für kurzfristige Trading-Entscheidungen relevante Datenpunkt.</div></div>
+  <div class="entry"><div class="term">Earnings / Quartalszahlen</div><div class="def">Vierteljährliche Veröffentlichung der Geschäftsergebnisse eines Unternehmens (Umsatz, Gewinn, Ausblick). Häufig Auslöser starker kurzfristiger Kursbewegungen der jeweiligen Aktie.</div></div>
+  <div class="entry"><div class="term">Guidance</div><div class="def">Die eigene Prognose eines Unternehmens für zukünftige Geschäftsperioden, meist im Rahmen der Quartalszahlen veröffentlicht. Wird von Tradern oft stärker beachtet als das vergangene Quartal selbst.</div></div>
+  <div class="entry"><div class="term">Safe Haven / Sicherer Hafen</div><div class="def">Anlageklassen, in die Kapital in Krisenzeiten typischerweise fließt — etwa Gold, US-Staatsanleihen, Schweizer Franken oder japanischer Yen.</div></div>
+  <div class="entry"><div class="term">Risk-On / Risk-Off</div><div class="def">"Risk-On" beschreibt eine Marktphase, in der Anleger verstärkt in risikoreichere Anlagen (Aktien, Schwellenländer) investieren. "Risk-Off" beschreibt die Flucht in sichere Anlagen.</div></div>
+  <div class="entry"><div class="term">Volatilität</div><div class="def">Maß für die Schwankungsintensität eines Preises. Hohe Volatilität bedeutet größere und schnellere Kursbewegungen in beide Richtungen.</div></div>
+</main>
+
+<script>
+function toggleMenu(show){ document.getElementById('sidemenu').classList.toggle('show', show); document.getElementById('overlay').classList.toggle('show', show); }
+document.getElementById('menubtn').addEventListener('click',(e)=>{ e.stopPropagation(); toggleMenu(true); });
+document.getElementById('overlay').addEventListener('click',()=>toggleMenu(false));
+</script>
+</body>
+</html>

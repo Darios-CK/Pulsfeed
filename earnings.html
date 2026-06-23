@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>PULSFEED — Earnings-Kalender</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap');
+  :root{ --bg:#060809; --panel:#0f1318; --panel-2:#151b21; --line:#1f2730; --text:#c7d0db; --text-dim:#5d6b7a; --green:#00ff9d; --red:#ff3b5c; --amber:#ffb238; --blue:#5fb3ff; --purple:#b388ff; }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0; background:var(--bg); color:var(--text); font-family:'Inter',sans-serif;}
+  a{color:inherit; text-decoration:none;}
+  button{cursor:pointer; font-family:inherit; background:none; border:none; color:inherit;}
+  ::-webkit-scrollbar{width:5px;}
+  ::-webkit-scrollbar-thumb{background:#1f2730; border-radius:3px;}
+
+  #overlay{ position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:90; opacity:0; pointer-events:none; transition:opacity 0.25s; }
+  #overlay.show{ opacity:1; pointer-events:auto; }
+  #sidemenu{ position:fixed; top:0; left:0; height:100%; width:82%; max-width:340px; background:var(--panel); border-right:1px solid var(--line); z-index:100; transform:translateX(-100%); transition:transform 0.28s ease; overflow-y:auto; padding-bottom:30px; }
+  #sidemenu.show{ transform:translateX(0); }
+  .menuhead{ padding:20px 18px 14px; border-bottom:1px solid var(--line); }
+  .menuhead .brand{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:1.25rem; color:#eef2f6; }
+  .menuhead .sub{ font-size:0.68rem; color:var(--text-dim); margin-top:3px; font-family:'JetBrains Mono',monospace; }
+  .menusection{ padding:14px 18px 4px; font-family:'JetBrains Mono',monospace; font-size:0.65rem; color:var(--text-dim); letter-spacing:0.06em; text-transform:uppercase; }
+  .menuitem{ display:flex; align-items:center; gap:12px; padding:13px 18px; border-bottom:1px solid #161b21; font-size:0.92rem; color:var(--text); }
+  .menuitem .ic{ font-size:1.1rem; width:22px; text-align:center; }
+  .menuitem .desc{ font-size:0.7rem; color:var(--text-dim); margin-top:2px; }
+  .menuitem.active{ background:rgba(0,255,157,0.06); border-left:3px solid var(--green); }
+  .menuitem .txt{ flex:1; }
+
+  header{ position:sticky; top:0; z-index:19; background:var(--bg); border-bottom:1px solid var(--line); padding:13px 16px 11px; }
+  .headrow{ display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .hleft{ display:flex; align-items:center; gap:12px; }
+  .menubtn{ font-size:1.3rem; padding:6px; line-height:1; color:var(--text); }
+  .brandwrap .brand{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:1.3rem; letter-spacing:-0.01em; color:#eef2f6; }
+  .brandwrap .sub{ font-family:'JetBrains Mono',monospace; font-size:0.64rem; color:var(--text-dim); margin-top:2px; }
+
+  .sortrow{ display:flex; gap:6px; padding:11px 16px 4px; overflow-x:auto; }
+  .sortpill{ flex:0 0 auto; font-family:'JetBrains Mono',monospace; font-size:0.66rem; padding:6px 12px; border-radius:20px; border:1px solid var(--line); background:transparent; color:var(--text-dim); white-space:nowrap; }
+  .sortpill.active{ border-color:var(--purple); color:var(--purple); background:rgba(179,136,255,0.08); }
+
+  .feed{ padding:12px 14px 40px; max-width:720px; margin:0 auto; }
+
+  .card{ background:var(--panel); border:1px solid var(--line); border-left:4px solid var(--purple); border-radius:10px; margin-bottom:9px; padding:13px 14px; }
+  .toprow{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:8px; }
+  .companyinfo{ display:flex; align-items:center; gap:10px; }
+  .ticker{ font-family:'JetBrains Mono',monospace; font-weight:700; font-size:0.78rem; color:var(--purple); background:rgba(179,136,255,0.1); padding:3px 8px; border-radius:5px; }
+  .companyname{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:0.95rem; color:#eef2f6; }
+  .sector{ font-size:0.68rem; color:var(--text-dim); margin-top:1px; }
+  .countdownbox{ text-align:right; }
+  .countdownbox .cd{ font-family:'JetBrains Mono',monospace; font-weight:700; font-size:0.92rem; color:var(--blue); }
+  .countdownbox .cdlabel{ font-size:0.62rem; color:var(--text-dim); margin-top:2px; }
+  .meta{ display:flex; gap:14px; font-family:'JetBrains Mono',monospace; font-size:0.7rem; color:var(--text-dim); flex-wrap:wrap; margin-top:4px; }
+  .meta b{ color:var(--text); }
+
+  .sectionlabel{ font-family:'JetBrains Mono',monospace; font-size:0.66rem; color:var(--text-dim); letter-spacing:0.08em; text-transform:uppercase; padding:14px 4px 8px; }
+
+  footer{ text-align:center; font-size:0.65rem; color:var(--text-dim); padding:20px 24px 36px; line-height:1.7; font-family:'JetBrains Mono',monospace; }
+</style>
+</head>
+<body>
+
+<div id="overlay"></div>
+<nav id="sidemenu">
+  <div class="menuhead"><div class="brand">PULSFEED</div><div class="sub">Markt-Terminal · Navigation</div></div>
+  <div class="menusection">Bereiche</div>
+  <a class="menuitem" href="index.html"><span class="ic">📊</span><span class="txt">Dashboard<div class="desc">Live News & Wirtschaftskalender</div></span></a>
+  <a class="menuitem active" href="earnings.html"><span class="ic">📅</span><span class="txt">Earnings-Kalender<div class="desc">Quartalszahlen der 30 wichtigsten Firmen</div></span></a>
+  <a class="menuitem" href="analysten.html"><span class="ic">🎯</span><span class="txt">Analysten-Einschätzungen<div class="desc">Strong Buy/Buy/Hold/Sell-Konsens</div></span></a>
+  <a class="menuitem" href="crypto.html"><span class="ic">₿</span><span class="txt">Krypto-Markt<div class="desc">BTC, ETH & Markt-News</div></span></a>
+  <a class="menuitem" href="forex.html"><span class="ic">💱</span><span class="txt">Währungspaare<div class="desc">EUR/USD, GBP/USD & weitere FX-News</div></span></a>
+  <a class="menuitem" href="indizes.html"><span class="ic">📈</span><span class="txt">Nasdaq & S&P 500<div class="desc">US-Leitindizes mit getrennten News</div></span></a>
+  <a class="menuitem" href="zinsen.html"><span class="ic">🏦</span><span class="txt">Notenbanken & Zinsen<div class="desc">Fed, EZB & weitere Termine</div></span></a>
+  <a class="menuitem" href="rohstoffe.html"><span class="ic">🛢️</span><span class="txt">Rohstoffe<div class="desc">Öl, Gold, Industriemetalle</div></span></a>
+  <div class="menusection">Info</div>
+  <a class="menuitem" href="glossar.html"><span class="ic">📖</span><span class="txt">Glossar<div class="desc">Begriffe & Indikatoren erklärt</div></span></a>
+</nav>
+
+<header>
+  <div class="headrow">
+    <div class="hleft">
+      <button class="menubtn" id="menubtn">☰</button>
+      <div class="brandwrap"><div class="brand">EARNINGS</div><div class="sub" id="statustext">30 marktbewegende Unternehmen</div></div>
+    </div>
+  </div>
+</header>
+
+<div class="sortrow" id="sortpills"></div>
+
+<main class="feed" id="feed"></main>
+
+<footer>
+  Earnings-Termine sind Schätzungen basierend auf historischen Veröffentlichungsmustern, da kostenlose APIs keine garantiert exakten Zukunftstermine liefern.<br>
+  Für den exakten Termin vor Handelsentscheidungen immer die offizielle Investor-Relations-Seite des Unternehmens prüfen.<br>
+  Keine Anlageberatung. Trading-Entscheidungen triffst du eigenverantwortlich.
+</footer>
+
+<script>
+// ============================================================
+// 30 marktbewegendste Unternehmen mit nächstem geschätzten Earnings-Termin.
+// Termine sind Annäherungen basierend auf typischen Veröffentlichungsfenstern
+// (z.B. "letzte Januar-Woche" für Q4-Zahlen großer Tech-Firmen) - siehe Footer-Hinweis.
+// ============================================================
+const COMPANIES = [
+  { ticker:'AAPL', name:'Apple', sector:'Technologie / Hardware', nextEarnings:'2026-07-30T21:30:00Z' },
+  { ticker:'MSFT', name:'Microsoft', sector:'Technologie / Software', nextEarnings:'2026-07-22T21:00:00Z' },
+  { ticker:'NVDA', name:'NVIDIA', sector:'Halbleiter', nextEarnings:'2026-08-26T21:00:00Z' },
+  { ticker:'AMZN', name:'Amazon', sector:'E-Commerce / Cloud', nextEarnings:'2026-07-31T21:00:00Z' },
+  { ticker:'GOOGL', name:'Alphabet (Google)', sector:'Technologie / Werbung', nextEarnings:'2026-07-22T20:30:00Z' },
+  { ticker:'META', name:'Meta Platforms', sector:'Technologie / Werbung', nextEarnings:'2026-07-29T21:00:00Z' },
+  { ticker:'TSLA', name:'Tesla', sector:'Elektrofahrzeuge', nextEarnings:'2026-07-23T20:30:00Z' },
+  { ticker:'AVGO', name:'Broadcom', sector:'Halbleiter', nextEarnings:'2026-09-10T21:00:00Z' },
+  { ticker:'AMD', name:'AMD', sector:'Halbleiter', nextEarnings:'2026-07-29T20:30:00Z' },
+  { ticker:'INTC', name:'Intel', sector:'Halbleiter', nextEarnings:'2026-07-24T20:30:00Z' },
+  { ticker:'TSM', name:'TSMC', sector:'Halbleiter / Fertigung', nextEarnings:'2026-07-16T06:00:00Z' },
+  { ticker:'ASML', name:'ASML', sector:'Halbleiter-Ausrüstung', nextEarnings:'2026-07-22T05:00:00Z' },
+  { ticker:'QCOM', name:'Qualcomm', sector:'Halbleiter / Mobilfunk', nextEarnings:'2026-07-30T20:30:00Z' },
+  { ticker:'TXN', name:'Texas Instruments', sector:'Halbleiter', nextEarnings:'2026-07-21T20:30:00Z' },
+  { ticker:'MU', name:'Micron Technology', sector:'Halbleiter / Speicher', nextEarnings:'2026-09-23T20:00:00Z' },
+  { ticker:'ORCL', name:'Oracle', sector:'Software / Cloud', nextEarnings:'2026-09-09T20:00:00Z' },
+  { ticker:'CRM', name:'Salesforce', sector:'Software', nextEarnings:'2026-08-26T20:15:00Z' },
+  { ticker:'ADBE', name:'Adobe', sector:'Software', nextEarnings:'2026-09-10T20:00:00Z' },
+  { ticker:'NFLX', name:'Netflix', sector:'Streaming / Medien', nextEarnings:'2026-07-16T20:00:00Z' },
+  { ticker:'PLTR', name:'Palantir Technologies', sector:'Software / Datenanalyse', nextEarnings:'2026-08-04T20:00:00Z' },
+  { ticker:'JPM', name:'JPMorgan Chase', sector:'Banken', nextEarnings:'2026-07-14T11:00:00Z' },
+  { ticker:'GS', name:'Goldman Sachs', sector:'Banken / Investment', nextEarnings:'2026-07-14T11:30:00Z' },
+  { ticker:'MS', name:'Morgan Stanley', sector:'Banken / Investment', nextEarnings:'2026-07-15T11:30:00Z' },
+  { ticker:'BAC', name:'Bank of America', sector:'Banken', nextEarnings:'2026-07-15T11:00:00Z' },
+  { ticker:'V', name:'Visa', sector:'Zahlungsdienstleister', nextEarnings:'2026-07-22T20:30:00Z' },
+  { ticker:'MA', name:'Mastercard', sector:'Zahlungsdienstleister', nextEarnings:'2026-07-30T12:00:00Z' },
+  { ticker:'WMT', name:'Walmart', sector:'Einzelhandel', nextEarnings:'2026-08-20T11:00:00Z' },
+  { ticker:'XOM', name:'ExxonMobil', sector:'Energie / Öl', nextEarnings:'2026-08-01T11:00:00Z' },
+  { ticker:'LLY', name:'Eli Lilly', sector:'Pharma', nextEarnings:'2026-08-06T11:00:00Z' },
+  { ticker:'JNJ', name:'Johnson & Johnson', sector:'Pharma / Gesundheit', nextEarnings:'2026-07-16T11:00:00Z' },
+];
+
+function fmtCountdown(ms){
+  if(ms<=0) return null;
+  const totalSec = Math.floor(ms/1000);
+  const d = Math.floor(totalSec/86400);
+  const h = Math.floor((totalSec%86400)/3600);
+  const m = Math.floor((totalSec%3600)/60);
+  const s = totalSec%60;
+  const pad = n=>String(n).padStart(2,'0');
+  return `${d}T ${pad(h)}:${pad(m)}:${pad(s)}`;
+}
+
+let sortMode = 'soonest';
+
+function render(){
+  const now = Date.now();
+  let list = COMPANIES.map(c=>({...c, ts:new Date(c.nextEarnings).getTime()}))
+    .filter(c=>c.ts > now - 3*24*3600*1000); // bereits vergangene >3 Tage ausblenden
+
+  if(sortMode==='soonest') list.sort((a,b)=>a.ts-b.ts);
+  else if(sortMode==='az') list.sort((a,b)=>a.name.localeCompare(b.name));
+  else if(sortMode==='sector') list.sort((a,b)=>a.sector.localeCompare(b.sector));
+
+  document.getElementById('feed').innerHTML = list.map(c=>{
+    const msToGo = c.ts - now;
+    const cd = fmtCountdown(msToGo);
+    const isPast = msToGo <= 0;
+    return `<div class="card">
+      <div class="toprow">
+        <div class="companyinfo">
+          <span class="ticker">${c.ticker}</span>
+          <div><div class="companyname">${c.name}</div><div class="sector">${c.sector}</div></div>
+        </div>
+        <div class="countdownbox">
+          ${isPast ? `<div class="cd" style="color:var(--amber)">Zahlen evtl. da</div>` : `<div class="cd">${cd}</div>`}
+          <div class="cdlabel">${isPast?'Termin erreicht':'bis Veröffentlichung'}</div>
+        </div>
+      </div>
+      <div class="meta"><span>Geschätzter Termin: <b>${new Date(c.nextEarnings).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}</b></span></div>
+    </div>`;
+  }).join('');
+}
+
+const SORT_LIST = [ {key:'soonest', label:'Nächste zuerst'}, {key:'az', label:'A–Z'}, {key:'sector', label:'Nach Sektor'} ];
+function renderSortPills(){
+  const c = document.getElementById('sortpills');
+  c.innerHTML = SORT_LIST.map(s=>`<button class="sortpill${sortMode===s.key?' active':''}" data-key="${s.key}">${s.label}</button>`).join('');
+  c.querySelectorAll('.sortpill').forEach(btn=>{ btn.addEventListener('click',()=>{ sortMode=btn.dataset.key; renderSortPills(); render(); }); });
+}
+
+function toggleMenu(show){ document.getElementById('sidemenu').classList.toggle('show', show); document.getElementById('overlay').classList.toggle('show', show); }
+document.getElementById('menubtn').addEventListener('click',(e)=>{ e.stopPropagation(); toggleMenu(true); });
+document.getElementById('overlay').addEventListener('click',()=>toggleMenu(false));
+
+renderSortPills();
+render();
+setInterval(render, 1000);
+</script>
+</body>
+</html>

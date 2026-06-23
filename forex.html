@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>PULSFEED — Währungspaare</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap');
+  :root{ --bg:#060809; --panel:#0f1318; --line:#1f2730; --text:#c7d0db; --text-dim:#5d6b7a; --green:#00ff9d; --red:#ff3b5c; --amber:#ffb238; --blue:#5fb3ff; }
+  *{box-sizing:border-box;} html,body{margin:0; padding:0; background:var(--bg); color:var(--text); font-family:'Inter',sans-serif;}
+  a{color:inherit; text-decoration:none;} button{cursor:pointer; font-family:inherit; background:none; border:none; color:inherit;}
+  #overlay{ position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:90; opacity:0; pointer-events:none; transition:opacity 0.25s; } #overlay.show{ opacity:1; pointer-events:auto; }
+  #sidemenu{ position:fixed; top:0; left:0; height:100%; width:82%; max-width:340px; background:var(--panel); border-right:1px solid var(--line); z-index:100; transform:translateX(-100%); transition:transform 0.28s ease; overflow-y:auto; }
+  #sidemenu.show{ transform:translateX(0); }
+  .menuhead{ padding:20px 18px 14px; border-bottom:1px solid var(--line); } .menuhead .brand{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:1.25rem; color:#eef2f6; }
+  .menuhead .sub{ font-size:0.68rem; color:var(--text-dim); margin-top:3px; font-family:'JetBrains Mono',monospace; }
+  .menusection{ padding:14px 18px 4px; font-family:'JetBrains Mono',monospace; font-size:0.65rem; color:var(--text-dim); letter-spacing:0.06em; text-transform:uppercase; }
+  .menuitem{ display:flex; align-items:center; gap:12px; padding:13px 18px; border-bottom:1px solid #161b21; font-size:0.92rem; color:var(--text); }
+  .menuitem .ic{ font-size:1.1rem; width:22px; text-align:center; } .menuitem .desc{ font-size:0.7rem; color:var(--text-dim); margin-top:2px; }
+  .menuitem.active{ background:rgba(0,255,157,0.06); border-left:3px solid var(--green); } .menuitem .txt{ flex:1; }
+  header{ position:sticky; top:0; z-index:19; background:var(--bg); border-bottom:1px solid var(--line); padding:13px 16px 11px; }
+  .headrow{ display:flex; justify-content:space-between; align-items:center; } .hleft{ display:flex; align-items:center; gap:12px; }
+  .menubtn{ font-size:1.3rem; padding:6px; color:var(--text); }
+  .brandwrap .brand{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:1.3rem; color:#eef2f6; }
+  .brandwrap .sub{ font-family:'JetBrains Mono',monospace; font-size:0.64rem; color:var(--text-dim); margin-top:2px; }
+  .feed{ padding:12px 14px 40px; max-width:720px; margin:0 auto; }
+  .sectionlabel{ font-family:'JetBrains Mono',monospace; font-size:0.66rem; color:var(--text-dim); letter-spacing:0.08em; text-transform:uppercase; padding:14px 4px 8px; }
+  .pairgrid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .paircard{ background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 13px; }
+  .pairname{ font-family:'JetBrains Mono',monospace; font-weight:700; font-size:0.82rem; color:var(--blue); margin-bottom:5px; }
+  .pairvalue{ font-family:'JetBrains Mono',monospace; font-weight:700; font-size:1.05rem; color:#eef2f6; }
+  .card{ background:var(--panel); border:1px solid var(--line); border-radius:10px; margin-bottom:9px; padding:13px 14px; border-left:4px solid var(--blue); }
+  .title{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:0.93rem; color:#eef2f6; line-height:1.35; margin-bottom:6px; }
+  .timestamp{ font-family:'JetBrains Mono',monospace; font-size:0.67rem; color:var(--text-dim); }
+  .insight{ margin-top:10px; padding-top:10px; border-top:1px dashed var(--line); font-size:0.78rem; line-height:1.55; color:#aab4c0; }
+  .insight .lead{ color:var(--blue); font-family:'JetBrains Mono',monospace; font-size:0.66rem; letter-spacing:0.05em; margin-bottom:5px; text-transform:uppercase; }
+  .insight b{ color:#d6dde5; } .insight .caveat{ color:var(--text-dim); margin-top:4px; display:block; }
+  .loading,.empty{ text-align:center; color:var(--text-dim); font-family:'JetBrains Mono',monospace; font-size:0.8rem; padding:50px 20px; }
+  .note{ font-size:0.7rem; color:var(--text-dim); padding:8px 4px 14px; line-height:1.6; }
+  footer{ text-align:center; font-size:0.65rem; color:var(--text-dim); padding:20px 24px 36px; line-height:1.7; font-family:'JetBrains Mono',monospace; }
+</style>
+</head>
+<body>
+
+<div id="overlay"></div>
+<nav id="sidemenu">
+  <div class="menuhead"><div class="brand">PULSFEED</div><div class="sub">Markt-Terminal · Navigation</div></div>
+  <div class="menusection">Bereiche</div>
+  <a class="menuitem" href="index.html"><span class="ic">📊</span><span class="txt">Dashboard<div class="desc">Live News & Wirtschaftskalender</div></span></a>
+  <a class="menuitem" href="earnings.html"><span class="ic">📅</span><span class="txt">Earnings-Kalender<div class="desc">Quartalszahlen der 30 wichtigsten Firmen</div></span></a>
+  <a class="menuitem" href="analysten.html"><span class="ic">🎯</span><span class="txt">Analysten-Einschätzungen<div class="desc">Strong Buy/Buy/Hold/Sell-Konsens</div></span></a>
+  <a class="menuitem" href="crypto.html"><span class="ic">₿</span><span class="txt">Krypto-Markt<div class="desc">BTC, ETH & Markt-News</div></span></a>
+  <a class="menuitem active" href="forex.html"><span class="ic">💱</span><span class="txt">Währungspaare<div class="desc">EUR/USD, GBP/USD & weitere FX-News</div></span></a>
+  <a class="menuitem" href="indizes.html"><span class="ic">📈</span><span class="txt">Nasdaq & S&P 500<div class="desc">US-Leitindizes mit getrennten News</div></span></a>
+  <a class="menuitem" href="zinsen.html"><span class="ic">🏦</span><span class="txt">Notenbanken & Zinsen<div class="desc">Fed, EZB & weitere Termine</div></span></a>
+  <a class="menuitem" href="rohstoffe.html"><span class="ic">🛢️</span><span class="txt">Rohstoffe<div class="desc">Öl, Gold, Industriemetalle</div></span></a>
+  <div class="menusection">Info</div>
+  <a class="menuitem" href="glossar.html"><span class="ic">📖</span><span class="txt">Glossar<div class="desc">Begriffe & Indikatoren erklärt</div></span></a>
+</nav>
+
+<header><div class="headrow"><div class="hleft"><button class="menubtn" id="menubtn">☰</button>
+  <div class="brandwrap"><div class="brand">WÄHRUNGEN</div><div class="sub" id="statustext">Lade…</div></div></div></div></header>
+
+<main class="feed">
+  <div class="sectionlabel">Wechselkurse</div>
+  <div class="pairgrid" id="pairgrid"></div>
+  <div class="note">Wechselkurse basieren auf EZB-Referenzkursen (Stand letzter Bankarbeitstag, ca. 16 Uhr CET) — keine Sekunden-Live-Kurse. Für exakte Handelskurse deinen Broker/dein Terminal prüfen.</div>
+  <div class="sectionlabel">Währungs-relevante News</div>
+  <div id="newsfeed"><div class="loading">Lade News…</div></div>
+</main>
+
+<footer>Kurse: Frankfurter / EZB · News: Investing.com, MarketWatch, CNBC<br>Keine Anlageberatung. Trading-Entscheidungen triffst du eigenverantwortlich.</footer>
+
+<script>
+const PAIRS = [ ['EUR','USD'], ['GBP','USD'], ['USD','JPY'], ['USD','CHF'], ['AUD','USD'], ['USD','CAD'], ['USD','CNY'], ['EUR','GBP'] ];
+
+async function loadRates(){
+  try{
+    const res = await fetch('https://api.frankfurter.dev/v2/latest?base=USD');
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    const grid = document.getElementById('pairgrid');
+    grid.innerHTML = PAIRS.map(([a,b])=>{
+      let val;
+      if(a==='USD') val = data.rates[b];
+      else if(b==='USD') val = 1/data.rates[a];
+      else val = data.rates[b]/data.rates[a];
+      return `<div class="paircard"><div class="pairname">${a}/${b}</div><div class="pairvalue">${val ? val.toFixed(4) : '—'}</div></div>`;
+    }).join('');
+    document.getElementById('statustext').textContent = 'Kurse vom '+data.date;
+  }catch(e){
+    document.getElementById('pairgrid').innerHTML = '<div class="empty" style="grid-column:1/-1;">Kurse aktuell nicht abrufbar.</div>';
+  }
+}
+
+const PROXIES = [
+  url => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
+  url => 'https://corsproxy.io/?url=' + encodeURIComponent(url),
+  url => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url),
+];
+async function fetchWithFallback(targetUrl, timeoutMs=8000){
+  let lastErr=null;
+  for(const buildUrl of PROXIES){
+    try{ const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(), timeoutMs);
+      const res = await fetch(buildUrl(targetUrl), { signal:controller.signal, cache:'no-store' }); clearTimeout(timer);
+      if(!res.ok) throw new Error('HTTP '+res.status); const text=await res.text(); if(!text||text.length<10) throw new Error('Leer'); return text;
+    }catch(e){ lastErr=e; continue; }
+  }
+  throw lastErr || new Error('Alle Proxies fehlgeschlagen');
+}
+function parseRSS(xmlText, source){
+  try{ const doc=new DOMParser().parseFromString(xmlText,'text/xml'); const items=Array.from(doc.querySelectorAll('item'));
+    return items.map(item=>{ const get=tag=>item.querySelector(tag)?.textContent?.trim()||''; return {id:get('link')||get('title'), title:get('title'), link:get('link'), pubDate:get('pubDate'), source}; });
+  }catch(e){ return []; }
+}
+function escapeHtml(s){ const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
+function timeAgo(dateStr){ const d=new Date(dateStr).getTime(); if(isNaN(d))return''; const diff=Date.now()-d; const min=Math.floor(diff/60000); if(min<1)return'jetzt'; if(min<60)return'vor '+min+' Min'; const h=Math.floor(min/60); if(h<24)return'vor '+h+' Std'; return'vor '+Math.floor(h/24)+' Tg'; }
+
+const FX_KEYWORDS = ['dollar','euro','pound','yen','franc','yuan','currency','währung','forex','fed','ecb','ezb','rate decision','zentralbank','central bank'];
+
+async function loadNews(){
+  try{
+    const sources = [
+      {url:'https://www.investing.com/rss/news.rss', source:'Investing.com'},
+      {url:'https://feeds.marketwatch.com/marketwatch/topstories/', source:'MarketWatch'},
+      {url:'https://www.cnbc.com/id/100003114/device/rss/rss.html', source:'CNBC'},
+    ];
+    const results = await Promise.all(sources.map(async s=>{ try{ const text=await fetchWithFallback(s.url); return parseRSS(text, s.source); }catch(e){ return []; } }));
+    let items = results.flat().filter(it=>FX_KEYWORDS.some(k=>it.title.toLowerCase().includes(k)));
+    items.sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate));
+    if(items.length===0){ document.getElementById('newsfeed').innerHTML='<div class="empty">Aktuell keine währungsspezifischen Meldungen in den Quellen.</div>'; return; }
+    document.getElementById('newsfeed').innerHTML = items.slice(0,15).map(it=>{
+      const t = it.title.toLowerCase();
+      let insight = '';
+      if(t.includes('fed')||t.includes('powell')){
+        insight = `<div class="insight"><div class="lead">📊 Trader-Einschätzung</div><div><b>Betroffen:</b> USD-Paare, US-Anleihen</div><div><b>Tendenz:</b> Hawkishe Aussagen werden meist als USD-stützend gehandelt, dovishe als belastend</div><span class="caveat"><b>Unsicherheit:</b> Erste Reaktion dreht sich oft nach vollständiger Analyse des Wortlauts</span></div>`;
+      } else if(t.includes('ecb')||t.includes('ezb')||t.includes('lagarde')){
+        insight = `<div class="insight"><div class="lead">📊 Trader-Einschätzung</div><div><b>Betroffen:</b> EUR-Paare, europäische Anleihen</div><div><b>Tendenz:</b> Hawkishe Tonlage meist EUR-stützend, dovishe meist belastend</div><span class="caveat"><b>Unsicherheit:</b> Ratsmitglieder äußern sich teils widersprüchlich</span></div>`;
+      }
+      return `<a class="card" href="${it.link}" target="_blank" rel="noopener noreferrer">
+        <div class="timestamp" style="margin-bottom:5px;">📰 ${escapeHtml(it.source)} · ${timeAgo(it.pubDate)}</div>
+        <div class="title">${escapeHtml(it.title)}</div>${insight}
+      </a>`;
+    }).join('');
+  }catch(e){ document.getElementById('newsfeed').innerHTML = '<div class="empty">News aktuell nicht abrufbar.</div>'; }
+}
+
+function toggleMenu(show){ document.getElementById('sidemenu').classList.toggle('show', show); document.getElementById('overlay').classList.toggle('show', show); }
+document.getElementById('menubtn').addEventListener('click',(e)=>{ e.stopPropagation(); toggleMenu(true); });
+document.getElementById('overlay').addEventListener('click',()=>toggleMenu(false));
+
+loadRates(); loadNews();
+setInterval(loadRates, 3600000);
+setInterval(loadNews, 60000);
+</script>
+</body>
+</html>
