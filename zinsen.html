@@ -49,6 +49,7 @@
   <a class="menuitem" href="index.html"><span class="ic">📊</span><span class="txt">Dashboard<div class="desc">Live News & Wirtschaftskalender</div></span></a>
   <a class="menuitem" href="earnings.html"><span class="ic">📅</span><span class="txt">Earnings-Kalender<div class="desc">Quartalszahlen der 30 wichtigsten Firmen</div></span></a>
   <a class="menuitem" href="analysten.html"><span class="ic">🎯</span><span class="txt">Analysten-Einschätzungen<div class="desc">Strong Buy/Buy/Hold/Sell-Konsens</div></span></a>
+  <a class="menuitem" href="ki-chat.html"><span class="ic">💬</span><span class="txt">KI-Erklärung<div class="desc">News einfach erklärt</div></span></a>
   <a class="menuitem" href="crypto.html"><span class="ic">₿</span><span class="txt">Krypto-Markt<div class="desc">BTC, ETH & Markt-News</div></span></a>
   <a class="menuitem" href="forex.html"><span class="ic">💱</span><span class="txt">Währungspaare<div class="desc">EUR/USD, GBP/USD & weitere FX-News</div></span></a>
   <a class="menuitem" href="indizes.html"><span class="ic">📈</span><span class="txt">Nasdaq & S&P 500<div class="desc">US-Leitindizes mit getrennten News</div></span></a>
@@ -70,6 +71,8 @@ const PROXIES = [
   url => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
   url => 'https://corsproxy.io/?url=' + encodeURIComponent(url),
   url => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url),
+  url => 'https://thingproxy.freeboard.io/fetch/' + url,
+  url => 'https://api.allorigins.win/get?url=' + encodeURIComponent(url),
 ];
 const FF_URL = 'https://nfs.faireconomy.media/ff_calendar_thisweek.json';
 const RATE_KEYWORDS = ['rate','zins','fed','ecb','ezb','boe','boj','rba','rbnz','snb','interest','press conference','statement','minutes'];
@@ -83,7 +86,10 @@ async function fetchWithFallback(targetUrl, timeoutMs=8000){
   for(const buildUrl of PROXIES){
     try{ const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(), timeoutMs);
       const res = await fetch(buildUrl(targetUrl), { signal:controller.signal, cache:'no-store' }); clearTimeout(timer);
-      if(!res.ok) throw new Error('HTTP '+res.status); const text = await res.text(); if(!text||text.length<10) throw new Error('Leer'); return text;
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      let text = await res.text();
+      try{ const parsed = JSON.parse(text); if(parsed && parsed.contents) text = parsed.contents; }catch(e){}
+      if(!text||text.length<10) throw new Error('Leer'); return text;
     }catch(e){ lastErr=e; continue; }
   }
   throw lastErr || new Error('Alle Proxies fehlgeschlagen');

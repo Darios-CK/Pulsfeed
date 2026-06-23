@@ -180,6 +180,10 @@
     <span class="ic">🎯</span>
     <span class="txt">Analysten-Einschätzungen<div class="desc">Strong Buy/Buy/Hold/Sell-Konsens</div></span>
   </a>
+  <a class="menuitem" href="ki-chat.html">
+    <span class="ic">💬</span>
+    <span class="txt">KI-Erklärung<div class="desc">News einfach erklärt</div></span>
+  </a>
   <a class="menuitem" href="crypto.html">
     <span class="ic">₿</span>
     <span class="txt">Krypto-Markt<div class="desc">BTC, ETH & Markt-News</div></span>
@@ -254,6 +258,7 @@ const PROXIES = [
   url => 'https://corsproxy.io/?url=' + encodeURIComponent(url),
   url => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url),
   url => 'https://thingproxy.freeboard.io/fetch/' + url,
+  url => 'https://api.allorigins.win/get?url=' + encodeURIComponent(url),
 ];
 
 const FF_URL = 'https://nfs.faireconomy.media/ff_calendar_thisweek.json';
@@ -300,31 +305,47 @@ const RELEVANT_KEYWORDS = [
   'default','downgrade','upgrade','rating'
 ];
 
+// Wortgrenzen-sicheres Matching: kurze/riskante Keywords (<=4 Zeichen, kein Leerzeichen)
+// nur an echten Wortgrenzen matchen, damit z.B. 'fed' nicht 'federal' o.ä. fälschlich trifft.
+// Längere Phrasen (mit Leerzeichen, z.B. 'federal reserve') bleiben normale Substring-Suche.
+function keywordMatches(text, keyword){
+  if(keyword.includes(' ') || keyword.length > 4){
+    return text.includes(keyword);
+  }
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp('\\b' + escaped + '\\b', 'i');
+  return re.test(text);
+}
+
 function isTradingRelevant(title){
   const t = (title||'').toLowerCase();
-  return RELEVANT_KEYWORDS.some(k=>t.includes(k));
+  return RELEVANT_KEYWORDS.some(k=>keywordMatches(t, k));
 }
 
 function matchIndicator(title){
   const t = (title||'').toLowerCase();
   for(const [key,val] of Object.entries(INDICATOR_KNOWLEDGE)){
-    if(t.includes(key)) return val;
+    if(keywordMatches(t, key)) return val;
   }
   return null;
 }
 function matchTopic(title){
   const t = (title||'').toLowerCase();
+  let best = null, bestScore = 0;
   for(const topic of TOPIC_KNOWLEDGE){
-    if(topic.keywords.some(k=>t.includes(k))) return topic;
+    const score = topic.keywords.filter(k=>keywordMatches(t, k)).length;
+    if(score > bestScore){ bestScore = score; best = topic; }
   }
-  return null;
+  return best;
 }
 function matchCrisis(title){
   const t = (title||'').toLowerCase();
+  let best = null, bestScore = 0;
   for(const c of CRISIS_WATCH){
-    if(c.keywords.some(k=>t.includes(k))) return c;
+    const score = c.keywords.filter(k=>keywordMatches(t, k)).length;
+    if(score > bestScore){ bestScore = score; best = c; }
   }
-  return null;
+  return best;
 }
 
 // ============================================================
@@ -505,7 +526,8 @@ async function fetchWithFallback(targetUrl, timeoutMs=8000){
       const res = await fetch(buildUrl(targetUrl), { signal:controller.signal, cache:'no-store' });
       clearTimeout(timer);
       if(!res.ok) throw new Error('HTTP '+res.status);
-      const text = await res.text();
+      let text = await res.text();
+      try{ const parsed = JSON.parse(text); if(parsed && parsed.contents) text = parsed.contents; }catch(e){}
       if(!text || text.length<10) throw new Error('Leere Antwort');
       return text;
     }catch(e){ lastErr=e; continue; }

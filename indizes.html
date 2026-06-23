@@ -36,7 +36,7 @@
   .catpill.active.all{ border-color:var(--text); color:var(--text); }
 
   .feed{ padding:12px 14px 40px; max-width:720px; margin:0 auto; }
-  .card{ background:var(--panel); border:1px solid var(--line); border-radius:10px; margin-bottom:9px; padding:13px 14px; }
+  .card{ background:var(--panel); border:1px solid var(--line); border-radius:10px; margin-bottom:9px; padding:13px 14px; display:block; position:relative; }
   .card.nasdaq{ border-left:4px solid var(--nasdaq); }
   .card.sp500{ border-left:4px solid var(--sp500); }
   .card.both{ border-left:4px solid var(--text-dim); }
@@ -61,6 +61,7 @@
   <a class="menuitem" href="index.html"><span class="ic">📊</span><span class="txt">Dashboard<div class="desc">Live News & Wirtschaftskalender</div></span></a>
   <a class="menuitem" href="earnings.html"><span class="ic">📅</span><span class="txt">Earnings-Kalender<div class="desc">Quartalszahlen der 30 wichtigsten Firmen</div></span></a>
   <a class="menuitem" href="analysten.html"><span class="ic">🎯</span><span class="txt">Analysten-Einschätzungen<div class="desc">Strong Buy/Buy/Hold/Sell-Konsens</div></span></a>
+  <a class="menuitem" href="ki-chat.html"><span class="ic">💬</span><span class="txt">KI-Erklärung<div class="desc">News einfach erklärt</div></span></a>
   <a class="menuitem" href="crypto.html"><span class="ic">₿</span><span class="txt">Krypto-Markt<div class="desc">BTC, ETH & Markt-News</div></span></a>
   <a class="menuitem" href="forex.html"><span class="ic">💱</span><span class="txt">Währungspaare<div class="desc">EUR/USD, GBP/USD & weitere FX-News</div></span></a>
   <a class="menuitem active" href="indizes.html"><span class="ic">📈</span><span class="txt">Nasdaq & S&P 500<div class="desc">US-Leitindizes mit getrennten News</div></span></a>
@@ -88,6 +89,8 @@ const PROXIES = [
   url => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
   url => 'https://corsproxy.io/?url=' + encodeURIComponent(url),
   url => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url),
+  url => 'https://thingproxy.freeboard.io/fetch/' + url,
+  url => 'https://api.allorigins.win/get?url=' + encodeURIComponent(url),
 ];
 const NEWS_SOURCES = [
   {url:'https://www.investing.com/rss/news.rss', source:'Investing.com'},
@@ -108,7 +111,10 @@ async function fetchWithFallback(targetUrl, timeoutMs=8000){
   for(const buildUrl of PROXIES){
     try{ const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(), timeoutMs);
       const res = await fetch(buildUrl(targetUrl), { signal:controller.signal, cache:'no-store' }); clearTimeout(timer);
-      if(!res.ok) throw new Error('HTTP '+res.status); const text=await res.text(); if(!text||text.length<10) throw new Error('Leer'); return text;
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      let text = await res.text();
+      try{ const parsed = JSON.parse(text); if(parsed && parsed.contents) text = parsed.contents; }catch(e){}
+      if(!text||text.length<10) throw new Error('Leer'); return text;
     }catch(e){ lastErr=e; continue; }
   }
   throw lastErr || new Error('Alle Proxies fehlgeschlagen');
@@ -119,11 +125,20 @@ function parseRSS(xmlText, source){
   }catch(e){ return []; }
 }
 
+function keywordMatches(text, keyword){
+  if(keyword.includes(' ') || keyword.length > 4){
+    return text.includes(keyword);
+  }
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp('\\b' + escaped + '\\b', 'i');
+  return re.test(text);
+}
+
 function classify(title){
   const t = title.toLowerCase();
-  const isNasdaq = NASDAQ_KEYWORDS.some(k=>t.includes(k));
-  const isSp500 = SP500_KEYWORDS.some(k=>t.includes(k));
-  const isGeneric = GENERIC_MARKET.some(k=>t.includes(k));
+  const isNasdaq = NASDAQ_KEYWORDS.some(k=>keywordMatches(t, k));
+  const isSp500 = SP500_KEYWORDS.some(k=>keywordMatches(t, k));
+  const isGeneric = GENERIC_MARKET.some(k=>keywordMatches(t, k));
   if(isNasdaq && isSp500) return 'both';
   if(isNasdaq) return 'nasdaq';
   if(isSp500) return 'sp500';

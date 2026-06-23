@@ -31,7 +31,7 @@
   .coinprice{ font-family:'JetBrains Mono',monospace; font-weight:700; font-size:0.95rem; color:#eef2f6; text-align:right; }
   .coinchange{ font-family:'JetBrains Mono',monospace; font-size:0.74rem; margin-top:2px; text-align:right; }
   .coinchange.up{ color:var(--green); } .coinchange.down{ color:var(--red); }
-  .card{ background:var(--panel); border:1px solid var(--line); border-left:4px solid var(--amber); border-radius:10px; margin-bottom:9px; padding:13px 14px; }
+  .card{ background:var(--panel); border:1px solid var(--line); border-left:4px solid var(--amber); border-radius:10px; margin-bottom:9px; padding:13px 14px; display:block; position:relative; }
   .title{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:0.93rem; color:#eef2f6; line-height:1.35; margin-bottom:6px; }
   .timestamp{ font-family:'JetBrains Mono',monospace; font-size:0.67rem; color:var(--text-dim); }
   .topicbadge{ font-family:'JetBrains Mono',monospace; font-size:0.6rem; padding:2px 7px; border-radius:4px; font-weight:700; background:rgba(255,178,56,0.14); color:var(--amber); }
@@ -52,6 +52,7 @@
   <a class="menuitem" href="index.html"><span class="ic">📊</span><span class="txt">Dashboard<div class="desc">Live News & Wirtschaftskalender</div></span></a>
   <a class="menuitem" href="earnings.html"><span class="ic">📅</span><span class="txt">Earnings-Kalender<div class="desc">Quartalszahlen der 30 wichtigsten Firmen</div></span></a>
   <a class="menuitem" href="analysten.html"><span class="ic">🎯</span><span class="txt">Analysten-Einschätzungen<div class="desc">Strong Buy/Buy/Hold/Sell-Konsens</div></span></a>
+  <a class="menuitem" href="ki-chat.html"><span class="ic">💬</span><span class="txt">KI-Erklärung<div class="desc">News einfach erklärt</div></span></a>
   <a class="menuitem" href="crypto.html"><span class="ic">₿</span><span class="txt">Krypto-Markt<div class="desc">BTC, ETH & Markt-News</div></span></a>
   <a class="menuitem" href="forex.html"><span class="ic">💱</span><span class="txt">Währungspaare<div class="desc">EUR/USD, GBP/USD & weitere FX-News</div></span></a>
   <a class="menuitem" href="indizes.html"><span class="ic">📈</span><span class="txt">Nasdaq & S&P 500<div class="desc">US-Leitindizes mit getrennten News</div></span></a>
@@ -111,11 +112,17 @@ const PROXIES = [
   url => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
   url => 'https://corsproxy.io/?url=' + encodeURIComponent(url),
   url => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url),
+  url => 'https://thingproxy.freeboard.io/fetch/' + url,
+  url => 'https://api.allorigins.win/get?url=' + encodeURIComponent(url),
 ];
 const NEWS_SOURCES = [
   {url:'https://www.investing.com/rss/news.rss', source:'Investing.com'},
   {url:'https://feeds.marketwatch.com/marketwatch/topstories/', source:'MarketWatch'},
   {url:'https://www.cnbc.com/id/100003114/device/rss/rss.html', source:'CNBC'},
+  {url:'https://www.cnbc.com/id/20910258/device/rss/rss.html', source:'CNBC Markets'},
+  {url:'https://www.nasdaq.com/feed/rssoutbound?category=Stocks', source:'Nasdaq'},
+  {url:'https://seekingalpha.com/feed.xml', source:'Seeking Alpha'},
+  {url:'https://feeds.benzinga.com/benzinga', source:'Benzinga'},
 ];
 const COMMODITY_KEYWORDS = [
   'oil','crude','wti','brent','opec','barrel',
@@ -134,7 +141,10 @@ async function fetchWithFallback(targetUrl, timeoutMs=8000){
   for(const buildUrl of PROXIES){
     try{ const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(), timeoutMs);
       const res = await fetch(buildUrl(targetUrl), { signal:controller.signal, cache:'no-store' }); clearTimeout(timer);
-      if(!res.ok) throw new Error('HTTP '+res.status); const text=await res.text(); if(!text||text.length<10) throw new Error('Leer'); return text;
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      let text = await res.text();
+      try{ const parsed = JSON.parse(text); if(parsed && parsed.contents) text = parsed.contents; }catch(e){}
+      if(!text||text.length<10) throw new Error('Leer'); return text;
     }catch(e){ lastErr=e; continue; }
   }
   throw lastErr || new Error('Alle Proxies fehlgeschlagen');
@@ -145,29 +155,38 @@ function parseRSS(xmlText, source){
   }catch(e){ return []; }
 }
 
+function keywordMatches(text, keyword){
+  if(keyword.includes(' ') || keyword.length > 4){
+    return text.includes(keyword);
+  }
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp('\\b' + escaped + '\\b', 'i');
+  return re.test(text);
+}
+
 function commodityInsight(title){
   const t = title.toLowerCase();
-  if(['oil','crude','wti','brent','opec','barrel'].some(k=>t.includes(k))){
+  if(['oil','crude','wti','brent','opec','barrel'].some(k=>keywordMatches(t, k))){
     return { assetClass:'Ölpreis (Brent/WTI), Energie-Aktien, Fluggesellschaften (Kostenseite)',
       tendency:'Förderkürzungen oder Lieferunterbrechungen werden meist als preistreibend gehandelt, Förderausweitungen als preisdrückend',
       caveat:'Tatsächliche Umsetzung weicht häufig von Ankündigungen ab' };
   }
-  if(['gold','xau','silver','xag','platinum','palladium'].some(k=>t.includes(k))){
+  if(['gold','xau','silver','xag','platinum','palladium'].some(k=>keywordMatches(t, k))){
     return { assetClass:'Edelmetalle, Minenbetreiber-Aktien, inverse Korrelation zum USD',
       tendency:'Unsicherheits- oder Krisensignale werden meist als preistreibend für Edelmetalle gehandelt (sicherer Hafen)',
       caveat:'Starker USD wirkt meist gegenläufig dämpfend auf Edelmetallpreise' };
   }
-  if(['natural gas','erdgas','lng'].some(k=>t.includes(k))){
+  if(['natural gas','erdgas','lng'].some(k=>keywordMatches(t, k))){
     return { assetClass:'Erdgas-Futures, europäische Energieversorger-Aktien',
       tendency:'Niedrige Speicherstände oder Lieferunterbrechungen werden meist als preistreibend gehandelt',
       caveat:'Starke saisonale Effekte (Winterbedarf) überlagern oft kurzfristige Schlagzeilen' };
   }
-  if(['wheat','weizen','corn','mais','soybean','sojabohne','grain','getreide'].some(k=>t.includes(k))){
+  if(['wheat','weizen','corn','mais','soybean','sojabohne','grain','getreide'].some(k=>keywordMatches(t, k))){
     return { assetClass:'Agrar-Futures, Agrarkonzerne, Düngemittel-Aktien',
       tendency:'Ernteausfälle oder Exportbeschränkungen werden meist als preistreibend gehandelt',
       caveat:'Wetterdaten und Erntefortschritt können kurzfristige Schlagzeilen schnell relativieren' };
   }
-  if(['copper','kupfer','aluminum','aluminium','nickel','zinc','zink','iron ore','eisenerz'].some(k=>t.includes(k))){
+  if(['copper','kupfer','aluminum','aluminium','nickel','zinc','zink','iron ore','eisenerz'].some(k=>keywordMatches(t, k))){
     return { assetClass:'Industriemetalle, Minenbetreiber, Industrie-/Bauaktien',
       tendency:'Wird oft als Konjunktur-Frühindikator gelesen — steigende Preise gelten als Wachstumssignal, fallende als Abschwächungssignal',
       caveat:'Chinesische Nachfrage hat überproportionalen Einfluss auf Industriemetallpreise' };
@@ -178,7 +197,7 @@ function commodityInsight(title){
 async function loadCommodityNews(){
   try{
     const results = await Promise.all(NEWS_SOURCES.map(async s=>{ try{ const text=await fetchWithFallback(s.url); return parseRSS(text, s.source); }catch(e){ return []; } }));
-    let items = results.flat().filter(it=>COMMODITY_KEYWORDS.some(k=>it.title.toLowerCase().includes(k)));
+    let items = results.flat().filter(it=>COMMODITY_KEYWORDS.some(k=>keywordMatches(it.title.toLowerCase(), k)));
     items.sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate));
     if(items.length===0){ document.getElementById('newsfeed').innerHTML = '<div class="empty">Aktuell keine rohstoffspezifischen Meldungen in den Quellen.</div>'; return; }
     document.getElementById('newsfeed').innerHTML = items.slice(0,20).map(it=>{

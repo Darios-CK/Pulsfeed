@@ -37,7 +37,7 @@
   .coinprice{ font-family:'JetBrains Mono',monospace; font-weight:700; font-size:0.95rem; color:#eef2f6; }
   .coinchange{ font-family:'JetBrains Mono',monospace; font-size:0.74rem; margin-top:2px; }
   .coinchange.up{ color:var(--green); } .coinchange.down{ color:var(--red); }
-  .card{ background:var(--panel); border:1px solid var(--line); border-left:4px solid var(--blue); border-radius:10px; margin-bottom:9px; padding:13px 14px; }
+  .card{ background:var(--panel); border:1px solid var(--line); border-left:4px solid var(--blue); border-radius:10px; margin-bottom:9px; padding:13px 14px; display:block; position:relative; }
   .title{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:0.93rem; color:#eef2f6; line-height:1.35; margin-bottom:5px; }
   .timestamp{ font-family:'JetBrains Mono',monospace; font-size:0.67rem; color:var(--text-dim); }
   .loading,.empty{ text-align:center; color:var(--text-dim); font-family:'JetBrains Mono',monospace; font-size:0.8rem; padding:50px 20px; }
@@ -53,6 +53,7 @@
   <a class="menuitem" href="index.html"><span class="ic">📊</span><span class="txt">Dashboard<div class="desc">Live News & Wirtschaftskalender</div></span></a>
   <a class="menuitem" href="earnings.html"><span class="ic">📅</span><span class="txt">Earnings-Kalender<div class="desc">Quartalszahlen der 30 wichtigsten Firmen</div></span></a>
   <a class="menuitem" href="analysten.html"><span class="ic">🎯</span><span class="txt">Analysten-Einschätzungen<div class="desc">Strong Buy/Buy/Hold/Sell-Konsens</div></span></a>
+  <a class="menuitem" href="ki-chat.html"><span class="ic">💬</span><span class="txt">KI-Erklärung<div class="desc">News einfach erklärt</div></span></a>
   <a class="menuitem active" href="crypto.html"><span class="ic">₿</span><span class="txt">Krypto-Markt<div class="desc">BTC, ETH & Markt-News</div></span></a>
   <a class="menuitem" href="forex.html"><span class="ic">💱</span><span class="txt">Währungspaare<div class="desc">EUR/USD, GBP/USD & weitere FX-News</div></span></a>
   <a class="menuitem" href="indizes.html"><span class="ic">📈</span><span class="txt">Nasdaq & S&P 500<div class="desc">US-Leitindizes mit getrennten News</div></span></a>
@@ -88,6 +89,8 @@ const PROXIES = [
   url => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
   url => 'https://corsproxy.io/?url=' + encodeURIComponent(url),
   url => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url),
+  url => 'https://thingproxy.freeboard.io/fetch/' + url,
+  url => 'https://api.allorigins.win/get?url=' + encodeURIComponent(url),
 ];
 
 function escapeHtml(s){ const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
@@ -121,7 +124,9 @@ async function fetchWithFallback(targetUrl, timeoutMs=8000){
       const res = await fetch(buildUrl(targetUrl), { signal:controller.signal, cache:'no-store' });
       clearTimeout(timer);
       if(!res.ok) throw new Error('HTTP '+res.status);
-      const text = await res.text(); if(!text||text.length<10) throw new Error('Leere Antwort'); return text;
+      let text = await res.text();
+      try{ const parsed = JSON.parse(text); if(parsed && parsed.contents) text = parsed.contents; }catch(e){}
+      if(!text||text.length<10) throw new Error('Leere Antwort'); return text;
     }catch(e){ lastErr=e; continue; }
   }
   throw lastErr || new Error('Alle Proxies fehlgeschlagen');
@@ -138,6 +143,10 @@ async function loadNews(){
     const sources = [
       {url:'https://feeds.marketwatch.com/marketwatch/topstories/', source:'MarketWatch'},
       {url:'https://www.cnbc.com/id/100003114/device/rss/rss.html', source:'CNBC'},
+      {url:'https://www.investing.com/rss/news.rss', source:'Investing.com'},
+      {url:'https://seekingalpha.com/feed.xml', source:'Seeking Alpha'},
+      {url:'https://feeds.benzinga.com/benzinga', source:'Benzinga'},
+      {url:'https://www.nasdaq.com/feed/rssoutbound?category=Stocks', source:'Nasdaq'},
     ];
     const results = await Promise.all(sources.map(async s=>{
       try{ const text = await fetchWithFallback(s.url); return parseRSS(text, s.source); }catch(e){ return []; }

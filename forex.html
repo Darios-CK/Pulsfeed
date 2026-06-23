@@ -29,7 +29,7 @@
   .paircard{ background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 13px; }
   .pairname{ font-family:'JetBrains Mono',monospace; font-weight:700; font-size:0.82rem; color:var(--blue); margin-bottom:5px; }
   .pairvalue{ font-family:'JetBrains Mono',monospace; font-weight:700; font-size:1.05rem; color:#eef2f6; }
-  .card{ background:var(--panel); border:1px solid var(--line); border-radius:10px; margin-bottom:9px; padding:13px 14px; border-left:4px solid var(--blue); }
+  .card{ background:var(--panel); border:1px solid var(--line); border-radius:10px; margin-bottom:9px; padding:13px 14px; border-left:4px solid var(--blue); display:block; position:relative; }
   .title{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:0.93rem; color:#eef2f6; line-height:1.35; margin-bottom:6px; }
   .timestamp{ font-family:'JetBrains Mono',monospace; font-size:0.67rem; color:var(--text-dim); }
   .insight{ margin-top:10px; padding-top:10px; border-top:1px dashed var(--line); font-size:0.78rem; line-height:1.55; color:#aab4c0; }
@@ -49,6 +49,7 @@
   <a class="menuitem" href="index.html"><span class="ic">📊</span><span class="txt">Dashboard<div class="desc">Live News & Wirtschaftskalender</div></span></a>
   <a class="menuitem" href="earnings.html"><span class="ic">📅</span><span class="txt">Earnings-Kalender<div class="desc">Quartalszahlen der 30 wichtigsten Firmen</div></span></a>
   <a class="menuitem" href="analysten.html"><span class="ic">🎯</span><span class="txt">Analysten-Einschätzungen<div class="desc">Strong Buy/Buy/Hold/Sell-Konsens</div></span></a>
+  <a class="menuitem" href="ki-chat.html"><span class="ic">💬</span><span class="txt">KI-Erklärung<div class="desc">News einfach erklärt</div></span></a>
   <a class="menuitem" href="crypto.html"><span class="ic">₿</span><span class="txt">Krypto-Markt<div class="desc">BTC, ETH & Markt-News</div></span></a>
   <a class="menuitem active" href="forex.html"><span class="ic">💱</span><span class="txt">Währungspaare<div class="desc">EUR/USD, GBP/USD & weitere FX-News</div></span></a>
   <a class="menuitem" href="indizes.html"><span class="ic">📈</span><span class="txt">Nasdaq & S&P 500<div class="desc">US-Leitindizes mit getrennten News</div></span></a>
@@ -97,13 +98,19 @@ const PROXIES = [
   url => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
   url => 'https://corsproxy.io/?url=' + encodeURIComponent(url),
   url => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url),
+  url => 'https://thingproxy.freeboard.io/fetch/' + url,
+  url => 'https://api.allorigins.win/get?url=' + encodeURIComponent(url),
 ];
 async function fetchWithFallback(targetUrl, timeoutMs=8000){
   let lastErr=null;
   for(const buildUrl of PROXIES){
     try{ const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(), timeoutMs);
       const res = await fetch(buildUrl(targetUrl), { signal:controller.signal, cache:'no-store' }); clearTimeout(timer);
-      if(!res.ok) throw new Error('HTTP '+res.status); const text=await res.text(); if(!text||text.length<10) throw new Error('Leer'); return text;
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      let text = await res.text();
+      // allorigins /get gibt JSON-Wrapper zurück statt Rohtext
+      try{ const parsed = JSON.parse(text); if(parsed && parsed.contents) text = parsed.contents; }catch(e){}
+      if(!text||text.length<10) throw new Error('Leer'); return text;
     }catch(e){ lastErr=e; continue; }
   }
   throw lastErr || new Error('Alle Proxies fehlgeschlagen');
@@ -116,6 +123,15 @@ function parseRSS(xmlText, source){
 function escapeHtml(s){ const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
 function timeAgo(dateStr){ const d=new Date(dateStr).getTime(); if(isNaN(d))return''; const diff=Date.now()-d; const min=Math.floor(diff/60000); if(min<1)return'jetzt'; if(min<60)return'vor '+min+' Min'; const h=Math.floor(min/60); if(h<24)return'vor '+h+' Std'; return'vor '+Math.floor(h/24)+' Tg'; }
 
+function keywordMatches(text, keyword){
+  if(keyword.includes(' ') || keyword.length > 4){
+    return text.includes(keyword);
+  }
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp('\\b' + escaped + '\\b', 'i');
+  return re.test(text);
+}
+
 const FX_KEYWORDS = ['dollar','euro','pound','yen','franc','yuan','currency','währung','forex','fed','ecb','ezb','rate decision','zentralbank','central bank'];
 
 async function loadNews(){
@@ -124,17 +140,22 @@ async function loadNews(){
       {url:'https://www.investing.com/rss/news.rss', source:'Investing.com'},
       {url:'https://feeds.marketwatch.com/marketwatch/topstories/', source:'MarketWatch'},
       {url:'https://www.cnbc.com/id/100003114/device/rss/rss.html', source:'CNBC'},
+      {url:'https://www.cnbc.com/id/20910258/device/rss/rss.html', source:'CNBC Markets'},
+      {url:'https://www.nasdaq.com/feed/rssoutbound?category=Stocks', source:'Nasdaq'},
+      {url:'https://seekingalpha.com/feed.xml', source:'Seeking Alpha'},
+      {url:'https://feeds.benzinga.com/benzinga', source:'Benzinga'},
+      {url:'https://www.marketbeat.com/feed/', source:'MarketBeat'},
     ];
     const results = await Promise.all(sources.map(async s=>{ try{ const text=await fetchWithFallback(s.url); return parseRSS(text, s.source); }catch(e){ return []; } }));
-    let items = results.flat().filter(it=>FX_KEYWORDS.some(k=>it.title.toLowerCase().includes(k)));
+    let items = results.flat().filter(it=>FX_KEYWORDS.some(k=>keywordMatches(it.title.toLowerCase(), k)));
     items.sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate));
     if(items.length===0){ document.getElementById('newsfeed').innerHTML='<div class="empty">Aktuell keine währungsspezifischen Meldungen in den Quellen.</div>'; return; }
     document.getElementById('newsfeed').innerHTML = items.slice(0,15).map(it=>{
       const t = it.title.toLowerCase();
       let insight = '';
-      if(t.includes('fed')||t.includes('powell')){
+      if(keywordMatches(t,'fed')||keywordMatches(t,'powell')){
         insight = `<div class="insight"><div class="lead">📊 Trader-Einschätzung</div><div><b>Betroffen:</b> USD-Paare, US-Anleihen</div><div><b>Tendenz:</b> Hawkishe Aussagen werden meist als USD-stützend gehandelt, dovishe als belastend</div><span class="caveat"><b>Unsicherheit:</b> Erste Reaktion dreht sich oft nach vollständiger Analyse des Wortlauts</span></div>`;
-      } else if(t.includes('ecb')||t.includes('ezb')||t.includes('lagarde')){
+      } else if(keywordMatches(t,'ecb')||keywordMatches(t,'ezb')||keywordMatches(t,'lagarde')){
         insight = `<div class="insight"><div class="lead">📊 Trader-Einschätzung</div><div><b>Betroffen:</b> EUR-Paare, europäische Anleihen</div><div><b>Tendenz:</b> Hawkishe Tonlage meist EUR-stützend, dovishe meist belastend</div><span class="caveat"><b>Unsicherheit:</b> Ratsmitglieder äußern sich teils widersprüchlich</span></div>`;
       }
       return `<a class="card" href="${it.link}" target="_blank" rel="noopener noreferrer">
